@@ -2,47 +2,37 @@
     RewriteEngine On
     RewriteBase /
 
-    # Remove index.php from URL
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteRule ^(.*)$ index.php/$1 [L]
+    # Blokir semua berkas dan folder berawalan titik -- terutama .git, yang
+    # bila terbuka memungkinkan seluruh repositori beserta riwayat commit
+    # diunduh utuh. Pengecualian .well-known wajib ada, dipakai Let's Encrypt
+    # untuk memperpanjang sertifikat SSL.
+    RewriteCond %{REQUEST_URI} !^/\.well-known/
+    RewriteRule (^|/)\. - [F,L]
 
-    # Prevent access to config files
-    RewriteRule ^config/ - [F,L]
-    RewriteRule ^database/ - [F,L]
-    RewriteRule ^logs/ - [F,L]
+    # Folder yang tidak boleh dilayani langsung.
+    RewriteRule ^(config|database|tools|logs)/ - [F,L]
 
-    # Security headers
-    <IfModule mod_headers.c>
-        Header set X-Content-Type-Options "nosniff"
-        Header set X-Frame-Options "SAMEORIGIN"
-        Header set X-XSS-Protection "1; mode=block"
-        Header set Referrer-Policy "strict-origin-when-cross-origin"
-    </IfModule>
+    # Dokumentasi dan dump SQL tidak perlu terbuka ke publik.
+    RewriteRule \.(md|sql)$ - [F,L]
 </IfModule>
 
-# PHP Configuration
-<IfModule mod_php.c>
-    php_flag display_errors Off
-    php_flag log_errors On
-    php_value error_log logs/php_error.log
-    php_value upload_max_filesize 100M
-    php_value post_max_size 100M
-    php_value max_execution_time 300
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>
 
-# Compression
+# Catatan: pengaturan display_errors TIDAK ditaruh di sini. php_flag hanya
+# berlaku untuk mod_php, sedangkan aaPanel menjalankan PHP-FPM sehingga
+# blok semacam itu diabaikan diam-diam. Pengaturannya ada di config/config.php,
+# dikendalikan lewat 'debug' di config/env.php.
+
 <IfModule mod_deflate.c>
-    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/x-javascript
+    AddOutputFilterByType DEFLATE text/html text/plain text/css text/javascript application/javascript
 </IfModule>
 
-# Browser caching
 <IfModule mod_expires.c>
     ExpiresActive On
-    ExpiresByType text/css A31536000
-    ExpiresByType text/javascript A31536000
-    ExpiresByType application/javascript A31536000
-    ExpiresByType image/jpeg A31536000
-    ExpiresByType image/gif A31536000
-    ExpiresByType image/png A31536000
+    ExpiresByType text/css A2592000
+    ExpiresByType application/javascript A2592000
 </IfModule>
