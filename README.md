@@ -45,20 +45,43 @@ app/
   add-project.php         tambah project dari GitHub
   databases.php           buat database per project
   phpmyadmin.php          pintasan ke PhpMyAdmin
-  api/clone.php           git clone   (JSON)
-  api/pull.php            git pull    (JSON)
+  api/clone.php           titipkan clone ke antrean (JSON)
+  api/pull.php            titipkan pull ke antrean  (JSON)
+  api/job-status.php      pantau status pekerjaan   (JSON)
 config/
   config.php              konstanta + koneksi + sesi
+  jobs.php                antrean pekerjaan git
   auth.php                verifikasi user ke database
   env.php                 kredensial -- diabaikan git
 database/cpanel-schema.sql
-tools/set-password.php    ganti password lewat terminal
+tools/
+  set-password.php        ganti password lewat terminal
+  worker.php              pengeksekusi git, dipanggil cron
 ```
+
+## Bagaimana clone dan pull dijalankan
+
+Panel **tidak** memanggil shell. Menekan Clone atau Pull hanya menambah baris
+di tabel `job_queue`; `tools/worker.php` yang dipanggil cron tiap menit yang
+menjalankan git, lalu menulis hasilnya kembali ke baris itu. Halaman menanyakan
+status secara berkala sampai selesai.
+
+Rancangan ini lahir karena panel hosting seperti aaPanel mematikan `exec()`
+pada PHP web lewat `disable_functions` -- dan itu memang seharusnya begitu.
+PHP CLI memakai berkas konfigurasi terpisah yang masih mengizinkannya, jadi
+worker tetap bisa bekerja tanpa melonggarkan keamanan PHP web.
+
+Pasang cron-nya:
+
+```
+* * * * * /usr/bin/php /path/ke/cpanel/tools/worker.php
+```
+
+Tanpa cron, pekerjaan akan menumpuk berstatus `pending` dan tidak pernah jalan.
 
 ## Catatan keamanan
 
-Panel ini menjalankan `git` lewat `exec()`. Siapa pun yang bisa login dapat
-menjalankan clone dan pull di server. Karena itu:
+Siapa pun yang bisa login dapat menyuruh server menjalankan git. Karena itu:
 
 - Jangan biarkan terbuka ke internet tanpa pembatasan. Pakai IP whitelist
   atau Basic Auth di depannya.
