@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             Pass: <code>password123</code>
         </div>
 
-        <form method="POST" action="test-login.php">
+        <form method="POST">
             <div class="form-group">
                 <label>Username</label>
                 <input type="text" name="username" required autofocus>
