@@ -12,14 +12,23 @@ define('DB_NAME', $env['db_name'] ?? 'sakuci_cpanel');
 // Default relatif terhadap folder aplikasi, jadi tidak terikat Windows/Linux.
 define('PROJECTS_PATH', $env['projects_path'] ?? dirname(__DIR__) . '/projects');
 
-$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-if ($conn->connect_error) {
-    // Pesan koneksi bisa memuat host/user, jadi jangan ditampilkan ke pengunjung.
-    error_log('DB connect failed: ' . $conn->connect_error);
+// Di server, galat tidak boleh tampil ke pengunjung: isinya memuat path,
+// nama user database, dan stack trace. Aktifkan hanya lewat 'debug' di env.php.
+// Catatan: php_flag di .htaccess tidak berlaku bila PHP dijalankan sebagai
+// PHP-FPM (seperti di aaPanel), jadi pengaturannya dilakukan di sini.
+ini_set('display_errors', !empty($env['debug']) ? '1' : '0');
+ini_set('log_errors', '1');
+
+// mysqli melempar exception sejak PHP 8.1, jadi cek $conn->connect_error
+// tidak pernah tercapai -- koneksi gagal harus ditangkap dengan try/catch.
+try {
+    $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+    $conn->set_charset("utf8mb4");
+} catch (mysqli_sql_exception $e) {
+    error_log('DB connect failed: ' . $e->getMessage());
     http_response_code(500);
-    exit('Database tidak dapat dihubungi.');
+    exit('Database tidak dapat dihubungi. Periksa config/env.php.');
 }
-$conn->set_charset("utf8mb4");
 
 if (session_status() === PHP_SESSION_NONE) {
     // The legacy user/ app runs on this same origin against a different

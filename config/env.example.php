@@ -12,4 +12,8 @@ return [
     //   Server  : '/www/wwwroot/cpanel.sakuci.id/projects'
     // Catatan: di aaPanel, path ini harus berada di dalam open_basedir situs.
     'projects_path' => __DIR__ . '/../projects',
+
+    // true hanya untuk pengembangan lokal. Di server WAJIB false, kalau tidak
+    // galat beserta path dan nama user database akan tampil ke pengunjung.
+    'debug' => false,
 ];
