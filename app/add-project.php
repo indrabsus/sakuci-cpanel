@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($name) || empty($domain) || empty($git_url)) {
         $error = '❌ Semua field harus diisi';
     } else {
-        $local_path = '../projects/' . preg_replace('/[^a-zA-Z0-9-_]/', '', $domain);
+        $local_path = PROJECTS_PATH . '/' . preg_replace('/[^a-zA-Z0-9-_]/', '', $domain);
 
         $stmt = $conn->prepare("INSERT INTO projects (user_id, name, domain, git_url, git_branch, local_path, status) VALUES (?, ?, ?, ?, ?, ?, 'active')");
         $stmt->bind_param("isssss", $user_id, $name, $domain, $git_url, $git_branch, $local_path);

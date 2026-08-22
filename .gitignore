@@ -35,6 +35,10 @@ database/backups/
 uploads/
 public/uploads/
 
+# Cloned user projects
+projects/
+cookies.txt
+
 # IDE
 .vscode
 .idea
