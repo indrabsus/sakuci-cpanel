@@ -64,10 +64,15 @@ chown www:www config/env.php && chmod 640 config/env.php
 ## 4. Impor skema dan buat user
 
 ```bash
-mysql -u sakuci_cpanel -p sakuci_cpanel < database/schema.sql
+mysql -u sakuci_cpanel -p sakuci_cpanel < database/cpanel-schema.sql
 ```
 
-Skema membawa user `admin` dengan password bawaan. **Ganti sekarang juga:**
+> Gunakan `cpanel-schema.sql`, **bukan** `schema.sql`. Berkas `schema.sql`,
+> `schema_clean.sql`, dan `schema_fixed.sql` adalah sisa aplikasi hosting
+> berbayar yang sudah dibatalkan dan akan membuat database yang salah.
+
+Skema membuat user `admin` yang **belum punya password sama sekali** --
+login mustahil sampai Anda menetapkannya:
 
 ```bash
 php tools/set-password.php admin
