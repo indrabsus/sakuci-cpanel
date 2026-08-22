@@ -1,0 +1,46 @@
+# Environment
+.env
+.env.local
+config/database.php
+
+# Logs
+logs/
+*.log
+
+# Cache
+cache/
+tmp/
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Dependencies
+vendor/
+node_modules/
+composer.lock
+package-lock.json
+
+# Backup files
+*.bak
+*.backup
+database/backups/
+
+# Upload files (optional)
+uploads/
+public/uploads/
+
+# IDE
+.vscode
+.idea
+*.sublime-project
+*.sublime-workspace
+
+# Testing
+.phpunit.result.cache
+coverage/
