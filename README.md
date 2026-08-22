@@ -1,347 +1,75 @@
-# Sakuci Hosting Platform
+# Sakuci cPanel
 
-Sistem web hosting profesional untuk Sakuci Framework dengan fitur lengkap termasuk database management, PhpMyAdmin, dan panel admin.
+Panel pengembangan untuk Sakuci Framework. Tiga hal saja: tambah project
+dari GitHub, clone/pull isinya, dan kelola database MySQL-nya.
 
-## 🚀 Fitur Utama
+Ini **bukan** panel hosting komersial -- tidak ada registrasi, paket, tagihan,
+atau tiket. Akun dibuat manual lewat terminal.
 
-### Untuk Customer
-- ✅ Registrasi & Login User
-- ✅ Dashboard Management
-- ✅ Kelola Hosting Account
-- ✅ File Manager
-- ✅ Database Management
-- ✅ Backup & Restore
-- ✅ Support Tickets
-- ✅ Billing & Invoice
+## Kebutuhan
 
-### Untuk Admin
-- ✅ Dashboard Statistik
-- ✅ Manage Customers
-- ✅ Manage Packages
-- ✅ Manage Servers
-- ✅ Database Manager (phpMyAdmin)
-- ✅ Activity Logs
-- ✅ Revenue Tracking
+- PHP 8.1+ dengan ekstensi `mysqli`
+- MySQL 8.0 atau MariaDB
+- `git` tersedia di PATH
 
-### Fitur Teknis
-- ✅ SSL Certificate
-- ✅ Automatic Backups
-- ✅ Uptime Monitoring
-- ✅ Bandwidth Tracking
-- ✅ PHP 8.1+
-- ✅ MySQL 8.0+
-- ✅ SSD Storage
-
-## 📋 Requirement
-
-- PHP 8.1 atau lebih tinggi
-- MySQL 8.0 atau PostgreSQL 12+
-- Web Server (Apache/Nginx)
-- cURL Extension
-- PDO MySQL
-
-## ⚙️ Instalasi
-
-### 1. Setup Database
+## Pasang
 
 ```bash
-# Import database schema
-mysql -u root < database/schema.sql
+git clone https://github.com/indrabsus/sakuci-cpanel.git
+cd sakuci-cpanel
+cp config/env.example.php config/env.php
 ```
 
-Atau manual:
-1. Buka phpMyAdmin
-2. Buat database baru: `sakuci_hosting`
-3. Import file `database/schema.sql`
-
-### 2. Konfigurasi Database
-
-Edit file `config/database.php`:
-
-```php
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'sakuci_hosting');
-define('DB_PORT', 3306);
-```
-
-### 3. Setup Web Server
-
-#### Apache (.htaccess)
-```apache
-<IfModule mod_rewrite.c>
-    RewriteEngine On
-    RewriteBase /
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteRule . index.php [L]
-</IfModule>
-```
-
-#### Nginx
-```nginx
-location / {
-    if (!-e $request_filename){
-        rewrite ^(.*)$ /index.php break;
-    }
-}
-```
-
-### 4. Permission Settings
+Sunting `config/env.php` sesuai database Anda, lalu:
 
 ```bash
-chmod 755 public/
-chmod 644 public/css/
-chmod 644 public/js/
-chmod 755 config/
+mysql -u <user> -p <nama_database> < database/cpanel-schema.sql
+php tools/set-password.php admin
 ```
 
-## 📁 Struktur File
+User `admin` dibuat tanpa password yang bisa dipakai -- login baru mungkin
+setelah perintah terakhir di atas dijalankan.
 
-```
-hosting/
-├── index.php                 # Homepage/Landing Page
-├── config/
-│   └── database.php         # Konfigurasi Database
-├── public/
-│   ├── css/
-│   │   └── style.css        # Stylesheet
-│   ├── js/
-│   │   └── script.js        # JavaScript
-│   └── assets/              # Images & Files
-├── user/
-│   ├── register.php         # Halaman Registrasi
-│   ├── login.php            # Halaman Login
-│   ├── dashboard.php        # Dashboard User
-│   ├── manage-hosting.php   # Kelola Hosting
-│   └── logout.php           # Logout
-├── admin/
-│   ├── index.php            # Admin Dashboard
-│   ├── customers.php        # Manage Customers
-│   ├── packages.php         # Manage Packages
-│   ├── servers.php          # Manage Servers
-│   ├── phpmyadmin-setup.php # Database Manager
-│   └── logout.php           # Admin Logout
-├── api/
-│   ├── auth.php             # API Authentication
-│   ├── hosting.php          # Hosting API
-│   └── files.php            # File Manager API
-└── database/
-    └── schema.sql           # Database Schema
-```
+Menjalankan secara lokal:
 
-## 🔐 Akun Default
-
-### Admin Account
-- **Username:** admin
-- **Email:** admin@sakuci-hosting.com
-- **Password:** admin123 (gunakan untuk testing)
-
-Untuk production, ubah password immediately!
-
-## 🛠️ Konfigurasi Paket Hosting
-
-Edit file atau database untuk menambah/edit paket:
-
-```sql
-INSERT INTO packages (
-    name, slug, description, 
-    disk_space, bandwidth, databases,
-    email_accounts, ftp_accounts, addon_domains,
-    price_monthly, price_yearly
-) VALUES (
-    'Premium', 'premium', 'Paket premium untuk bisnis',
-    10240, 500, 10,
-    50, 25, 25,
-    99.99, 999.99
-);
-```
-
-## 📊 Dashboard Admin
-
-### Menu Utama
-- **Dashboard:** Statistik umum dan summary
-- **Customers:** Kelola semua customer dan status
-- **Packages:** Edit harga dan fitur paket
-- **Servers:** Kelola server dan resource
-- **PhpMyAdmin:** Database management interface
-
-## 🔧 PhpMyAdmin Setup
-
-PhpMyAdmin terintegrasi untuk management database:
-
-### Akses PhpMyAdmin
-1. URL: `http://phpmyadmin.sakuci-hosting.com`
-2. Username: Database user yang sudah dibuat
-3. Password: Password database
-
-### Fitur Database Manager
-- Buat database baru
-- Manage users & permissions
-- Import/Export data
-- Query builder
-- Backup database
-
-## 📈 Fitur Billing
-
-### Order Management
-- Status tracking: pending, completed, failed, cancelled
-- Invoice generation otomatis
-- Payment method tracking
-- Billing cycle: monthly, yearly, biennial
-
-### Revenue Tracking
-- Total revenue dashboard
-- Order history
-- Invoice management
-- Tax calculation
-
-## 🎫 Support Ticket System
-
-### Features
-- Create ticket dengan kategori
-- Priority levels: low, medium, high, urgent
-- Status tracking: open, in_progress, waiting, resolved
-- Admin assignment
-- Reply notifications
-
-## 📱 Responsive Design
-
-Website fully responsive untuk:
-- 💻 Desktop (1200px+)
-- 📱 Tablet (768px - 1199px)
-- 📲 Mobile (< 768px)
-
-## 🔐 Security Features
-
-- ✅ Password hashing (bcrypt)
-- ✅ SQL injection prevention
-- ✅ XSS protection
-- ✅ CSRF token (implementasi)
-- ✅ Session security
-- ✅ HTTP headers security
-
-## 📝 Database Tables
-
-### Users
-- user management
-- role-based access (user, admin, reseller)
-- status tracking
-
-### Hosting Accounts
-- domain management
-- package assignment
-- server allocation
-- status monitoring
-
-### Orders & Invoices
-- order tracking
-- invoice generation
-- payment processing
-
-### Support Tickets
-- ticket management
-- priority handling
-- admin assignment
-
-### Databases
-- MySQL database creation
-- User credentials
-- Database permissions
-
-### Servers
-- server information
-- resource tracking
-- account allocation
-
-### Activity Logs
-- audit trail
-- user actions
-- system events
-
-## 🚀 Deployment
-
-### Production Checklist
-- [ ] Update database credentials
-- [ ] Change admin password
-- [ ] Enable HTTPS
-- [ ] Set proper file permissions
-- [ ] Enable error logging
-- [ ] Disable debug mode
-- [ ] Setup backups
-- [ ] Configure email notifications
-- [ ] Setup firewall rules
-- [ ] Monitor server resources
-
-## 🐛 Troubleshooting
-
-### Database Connection Error
-```
-Solusi: Periksa config/database.php
-- Host, user, password, database name
-- MySQL service running
-```
-
-### Permission Denied
-```
-Solusi: Update file permissions
-chmod 755 direktori
-chmod 644 file PHP
-```
-
-### Session Problems
-```
-Solusi: Periksa session.save_path
-Buat folder: /tmp atau /var/lib/php/sessions
-```
-
-## 📚 API Documentation
-
-### Authentication
-```php
-POST /api/auth.php
-Parameters: username, password
-Response: user_id, username, role
-```
-
-### Hosting Management
-```php
-GET /api/hosting.php?action=list&user_id=1
-POST /api/hosting.php?action=create
-PUT /api/hosting.php?action=update&id=1
-DELETE /api/hosting.php?action=delete&id=1
-```
-
-## 🔄 Backup & Restore
-
-### Backup Database
 ```bash
-mysqldump -u root sakuci_hosting > backup_$(date +%Y%m%d).sql
+php -S 127.0.0.1:8000
 ```
 
-### Restore Database
-```bash
-mysql -u root sakuci_hosting < backup_20240101.sql
+## Struktur
+
+```
+index.php                 halaman login
+app/
+  dashboard.php           daftar project + tombol clone/pull
+  add-project.php         tambah project dari GitHub
+  databases.php           buat database per project
+  phpmyadmin.php          pintasan ke PhpMyAdmin
+  api/clone.php           git clone   (JSON)
+  api/pull.php            git pull    (JSON)
+config/
+  config.php              konstanta + koneksi + sesi
+  auth.php                verifikasi user ke database
+  env.php                 kredensial -- diabaikan git
+database/cpanel-schema.sql
+tools/set-password.php    ganti password lewat terminal
 ```
 
-## 📞 Support & Contact
+## Catatan keamanan
 
-- Email: support@sakuci-hosting.com
-- Phone: +62-XXX-XXX-XXXX
-- Hours: 24/7
-- Website: www.sakuci-hosting.com
+Panel ini menjalankan `git` lewat `exec()`. Siapa pun yang bisa login dapat
+menjalankan clone dan pull di server. Karena itu:
 
-## 📄 License
+- Jangan biarkan terbuka ke internet tanpa pembatasan. Pakai IP whitelist
+  atau Basic Auth di depannya.
+- Selalu lewat HTTPS -- login mengirim password.
+- Pakai password panjang; `tools/set-password.php` mensyaratkan 12 karakter.
 
-This project is proprietary software for Sakuci Hosting. All rights reserved.
+Panduan pemasangan di server ada di [DEPLOY.md](DEPLOY.md).
 
-## 🤝 Kontribusi
+## Cara kerja `pull`
 
-Untuk bug reports dan feature requests, hubungi tim development.
-
----
-
-**Version:** 1.0.0  
-**Last Updated:** 2024  
-**Status:** Production Ready
+`api/pull.php` menjalankan `git fetch` lalu `git reset --hard origin/<branch>`.
+Perubahan lokal yang belum di-commit di folder project **akan hilang**. Ini
+disengaja: server harus mencerminkan isi repo, bukan menyimpan suntingan
+langsung.

@@ -27,14 +27,22 @@ Simpan passwordnya di password manager. Jangan kirim lewat chat.
 ```bash
 cd /www/wwwroot/cpanel.sakuci.id
 rm -f index.html 404.html 502.html
-git clone https://github.com/indrabsus/sakuci-cpanel.git sakuci-cpanel
+git init -q
+git remote add origin https://github.com/indrabsus/sakuci-cpanel.git
+git fetch -q origin main
+git checkout -f -b main origin/main
 chown -R www:www /www/wwwroot/cpanel.sakuci.id
 ```
+
+Dipakai `git init` + `fetch`, bukan `git clone`, karena folder situs sudah
+berisi `.well-known` (dipakai aaPanel untuk perpanjangan SSL) dan `.user.ini`.
+Cara ini menaruh kode di akar situs tanpa menyentuh keduanya, sehingga
+Document Root tidak perlu diubah dan sertifikat tetap bisa diperbarui.
 
 ## 3. Isi konfigurasi
 
 ```bash
-cd /www/wwwroot/cpanel.sakuci.id/sakuci-cpanel
+cd /www/wwwroot/cpanel.sakuci.id
 cp config/env.example.php config/env.php
 mkdir -p projects && chown www:www projects
 nano config/env.php
@@ -48,7 +56,7 @@ return [
     'db_name' => 'sakuci_cpanel',
     'db_user' => 'sakuci_cpanel',
     'db_pass' => 'PASSWORD_DARI_LANGKAH_1',
-    'projects_path' => '/www/wwwroot/cpanel.sakuci.id/sakuci-cpanel/projects',
+    'projects_path' => '/www/wwwroot/cpanel.sakuci.id/projects',
 ];
 ```
 
@@ -85,9 +93,9 @@ bcrypt-nya yang tersimpan.
 
 **aaPanel → Website → cpanel.sakuci.id:**
 
-1. **Site Directory**
-   - Site directory: `/www/wwwroot/cpanel.sakuci.id/sakuci-cpanel`
-   - Running directory: `/` (index.php ada di akar repo)
+1. **Site Directory:** biarkan apa adanya
+   (`/www/wwwroot/cpanel.sakuci.id`, running directory `/`) -- kode sudah
+   berada di akar situs, jadi tidak ada yang perlu diubah di sini.
 2. **PHP version:** 8.2 atau 8.3
 3. **SSL → Force HTTPS: ON** -- tanpa ini password login terkirim polos
 4. **Security → IP whitelist:** isi IP Anda saja
@@ -112,7 +120,7 @@ Poin terakhir yang membuktikan pembatasan akses benar-benar aktif.
 ## Update berikutnya
 
 ```bash
-cd /www/wwwroot/cpanel.sakuci.id/sakuci-cpanel && git pull
+cd /www/wwwroot/cpanel.sakuci.id && git pull
 ```
 
 `config/env.php` dan `projects/` diabaikan git, jadi tidak akan tertimpa.
