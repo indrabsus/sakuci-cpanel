@@ -77,6 +77,7 @@ if ($result) {
         .status-active { background: #dcfce7; color: #166534; }
         .status-inactive { background: #fee2e2; color: #991b1b; }
     </style>
+    <link rel="stylesheet" href="assets/git-actions.css">
 </head>
 <body>
     <header>
@@ -140,7 +141,8 @@ if ($result) {
 
             <?php if (!empty($projects)): ?>
                 <?php foreach ($projects as $proj): ?>
-                    <div class="project-item">
+                    <?php $cloned = is_dir($proj['local_path']); ?>
+                    <div class="project-item" data-project="<?php echo $proj['id']; ?>">
                         <div style="display: flex; justify-content: space-between; align-items: start;">
                             <div>
                                 <h3><?php echo htmlspecialchars($proj['name']); ?></h3>
@@ -155,6 +157,20 @@ if ($result) {
                                 <?php echo ucfirst($proj['status']); ?>
                             </span>
                         </div>
+                        <div class="git-actions">
+                            <?php if ($cloned): ?>
+                                <button class="git-btn" data-action="pull">⬇️ Pull</button>
+                                <span class="git-status">
+                                    <?php echo $proj['last_pull']
+                                        ? 'Last pull: ' . date('d M Y H:i', strtotime($proj['last_pull']))
+                                        : 'Belum pernah di-pull'; ?>
+                                </span>
+                            <?php else: ?>
+                                <button class="git-btn" data-action="clone">📥 Clone</button>
+                                <span class="git-status">Belum di-clone ke server</span>
+                            <?php endif; ?>
+                        </div>
+                        <pre class="git-output"></pre>
                     </div>
                 <?php endforeach; ?>
             <?php else: ?>
@@ -162,5 +178,6 @@ if ($result) {
             <?php endif; ?>
         </div>
     </div>
+    <script src="assets/git-actions.js"></script>
 </body>
 </html>

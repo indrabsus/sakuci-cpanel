@@ -52,7 +52,11 @@ if (is_dir($local_path)) {
 }
 
 // Clone repository
-$cmd = "cd " . escapeshellarg($projects_base) . " && git clone --branch " . escapeshellarg($git_branch) . " " . escapeshellarg($git_url) . " " . escapeshellarg(basename($local_path)) . " 2>&1";
+// Each command redirects its own stderr; a trailing 2>&1 would only cover the last one.
+$cmd = "cd " . escapeshellarg($projects_base) . " 2>&1"
+    . " && git clone --branch " . escapeshellarg($git_branch)
+    . " " . escapeshellarg($git_url)
+    . " " . escapeshellarg(basename($local_path)) . " 2>&1";
 $output = [];
 $return_var = 0;
 exec($cmd, $output, $return_var);

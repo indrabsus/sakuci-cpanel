@@ -51,11 +51,9 @@ if ($result) {
         .project-card { background: #f7fafc; border: 1px solid #e2e8f0; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; }
         .project-name { font-weight: 600; color: #333; font-size: 1.1rem; }
         .project-info { color: #666; font-size: 0.9rem; margin-top: 0.5rem; }
-        .project-actions { margin-top: 1rem; }
-        .project-actions a { display: inline-block; margin-right: 1rem; padding: 0.5rem 1rem; background: #667eea; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9rem; }
-        .project-actions a:hover { background: #5568d3; }
         .logout { color: #e53e3e; }
     </style>
+    <link rel="stylesheet" href="assets/git-actions.css">
 </head>
 <body>
     <header>
@@ -91,7 +89,8 @@ if ($result) {
             <?php if (count($projects) > 0): ?>
                 <div style="margin-top: 1.5rem;">
                     <?php foreach ($projects as $project): ?>
-                    <div class="project-card">
+                    <?php $cloned = is_dir($project['local_path']); ?>
+                    <div class="project-card" data-project="<?php echo $project['id']; ?>">
                         <div class="project-name">📂 <?php echo htmlspecialchars($project['name']); ?></div>
                         <div class="project-info">
                             🌐 <?php echo htmlspecialchars($project['domain'] ?? 'No domain'); ?><br>
@@ -99,10 +98,20 @@ if ($result) {
                             🔀 Branch: <?php echo htmlspecialchars($project['git_branch']); ?><br>
                             📅 <?php echo date('d M Y', strtotime($project['created_at'])); ?>
                         </div>
-                        <div class="project-actions">
-                            <a href="project-detail.php?id=<?php echo $project['id']; ?>">View</a>
-                            <a href="api/pull.php?id=<?php echo $project['id']; ?>">⬇️ Pull</a>
+                        <div class="git-actions">
+                            <?php if ($cloned): ?>
+                                <button class="git-btn" data-action="pull">⬇️ Pull</button>
+                                <span class="git-status">
+                                    <?php echo $project['last_pull']
+                                        ? 'Last pull: ' . date('d M Y H:i', strtotime($project['last_pull']))
+                                        : 'Belum pernah di-pull'; ?>
+                                </span>
+                            <?php else: ?>
+                                <button class="git-btn" data-action="clone">📥 Clone</button>
+                                <span class="git-status">Belum di-clone ke server</span>
+                            <?php endif; ?>
                         </div>
+                        <pre class="git-output"></pre>
                     </div>
                     <?php endforeach; ?>
                 </div>
@@ -111,5 +120,6 @@ if ($result) {
             <?php endif; ?>
         </div>
     </div>
+    <script src="assets/git-actions.js"></script>
 </body>
 </html>

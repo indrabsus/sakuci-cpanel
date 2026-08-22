@@ -45,7 +45,10 @@ if (!is_dir($local_path)) {
 }
 
 // Pull from git
-$cmd = "cd " . escapeshellarg($local_path) . " && git fetch origin && git reset --hard origin/" . escapeshellarg($git_branch) . " 2>&1";
+// Each command redirects its own stderr; a trailing 2>&1 would only cover the last one.
+$cmd = "cd " . escapeshellarg($local_path)
+    . " && git fetch origin 2>&1"
+    . " && git reset --hard origin/" . escapeshellarg($git_branch) . " 2>&1";
 $output = [];
 $return_var = 0;
 exec($cmd, $output, $return_var);
