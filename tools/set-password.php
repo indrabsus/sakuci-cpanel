@@ -23,16 +23,22 @@ function readSecret(string $prompt): string
 {
     echo $prompt;
 
-    $hidden = false;
-    if (DIRECTORY_SEPARATOR !== '\\' && shell_exec('command -v stty 2>/dev/null')) {
-        shell_exec('stty -echo 2>/dev/null');
-        $hidden = true;
+    // shell_exec sering dimatikan lewat disable_functions (aaPanel melakukannya
+    // secara bawaan). Fungsi yang dimatikan menjadi undefined di PHP 8, jadi
+    // memanggilnya tanpa pemeriksaan akan menghentikan skrip ini.
+    $canHide = DIRECTORY_SEPARATOR !== '\\' && function_exists('shell_exec');
+
+    if ($canHide) {
+        $canHide = (bool) @shell_exec('command -v stty 2>/dev/null');
+    }
+    if ($canHide) {
+        @shell_exec('stty -echo 2>/dev/null');
     }
 
     $value = trim((string) fgets(STDIN));
 
-    if ($hidden) {
-        shell_exec('stty echo 2>/dev/null');
+    if ($canHide) {
+        @shell_exec('stty echo 2>/dev/null');
         echo "\n";
     } else {
         echo "  (catatan: terminal ini menampilkan ketikan Anda)\n";
