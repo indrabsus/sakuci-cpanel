@@ -1,18 +1,21 @@
 <?php
 include 'config/config.php';
+include 'config/auth.php';
 
 if (isset($_GET['logout'])) {
-    session_destroy();
+    clear_session();
     header("Location: index.php");
     exit;
 }
 
-if (isset($_SESSION['user_id'])) {
+// Validate rather than just checking the key, so a stale session shows the
+// login form here instead of bouncing off the dashboard and back.
+if (current_user($conn)) {
     header("Location: app/dashboard.php");
     exit;
 }
 
-$error = '';
+$error = isset($_GET['expired']) ? '❌ Sesi Anda sudah tidak berlaku. Silakan login kembali.' : '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';

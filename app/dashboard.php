@@ -1,12 +1,10 @@
 <?php
 include '../config/config.php';
-if (!isset($_SESSION['user_id'])) {
-    header("Location: ../index.php");
-    exit;
-}
+include '../config/auth.php';
 
-$user_id = $_SESSION['user_id'];
-$username = $_SESSION['username'];
+$user = require_login($conn);
+$user_id = $user['id'];
+$username = $user['username'];
 
 // Get projects
 $projects = [];

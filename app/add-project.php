@@ -1,13 +1,10 @@
 <?php
 include '../config/config.php';
+include '../config/auth.php';
 
-if (!isset($_SESSION['user_id'])) {
-    header("Location: ../index.php");
-    exit;
-}
-
-$user_id = $_SESSION['user_id'];
-$username = $_SESSION['username'];
+$user = require_login($conn);
+$user_id = $user['id'];
+$username = $user['username'];
 $error = '';
 $success = '';
 
@@ -22,14 +19,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $local_path = PROJECTS_PATH . '/' . preg_replace('/[^a-zA-Z0-9-_]/', '', $domain);
 
-        $stmt = $conn->prepare("INSERT INTO projects (user_id, name, domain, git_url, git_branch, local_path, status) VALUES (?, ?, ?, ?, ?, ?, 'active')");
-        $stmt->bind_param("isssss", $user_id, $name, $domain, $git_url, $git_branch, $local_path);
+        // mysqli throws on error here, so catch it rather than letting a fatal
+        // dump a stack trace with server paths at the user.
+        try {
+            $stmt = $conn->prepare("INSERT INTO projects (user_id, name, domain, git_url, git_branch, local_path, status) VALUES (?, ?, ?, ?, ?, ?, 'active')");
+            $stmt->bind_param("isssss", $user_id, $name, $domain, $git_url, $git_branch, $local_path);
+            $stmt->execute();
 
-        if ($stmt->execute()) {
             $project_id = $conn->insert_id;
             $success = "✅ Project berhasil ditambahkan! ID: $project_id";
-        } else {
-            $error = "❌ Error: " . $conn->error;
+        } catch (mysqli_sql_exception $e) {
+            error_log('add-project insert failed: ' . $e->getMessage());
+            $error = '❌ Gagal menyimpan project. Silakan coba lagi.';
         }
     }
 }

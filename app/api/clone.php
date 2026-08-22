@@ -1,15 +1,10 @@
 <?php
 include '../../config/config.php';
+include '../../config/auth.php';
 
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id'])) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized']);
-    exit;
-}
-
-$user_id = $_SESSION['user_id'];
+$user_id = require_api_login($conn)['id'];
 $project_id = intval($_GET['project_id'] ?? 0);
 
 if ($project_id <= 0) {

@@ -12,5 +12,9 @@ if ($conn->connect_error) {
 $conn->set_charset("utf8mb4");
 
 if (session_status() === PHP_SESSION_NONE) {
+    // The legacy user/ app runs on this same origin against a different
+    // database. Sharing the default PHPSESSID let its user_id leak into this
+    // app, where the id belongs to a different (or no) user.
+    session_name('SAKUCI_CPANEL');
     session_start();
 }
