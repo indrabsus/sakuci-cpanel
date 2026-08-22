@@ -2,6 +2,7 @@
 .env
 .env.local
 config/database.php
+config/env.php
 
 # Logs
 logs/
