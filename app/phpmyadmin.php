@@ -54,22 +54,25 @@ $username = $user['username'];
         <div class="section">
             <h2>📊 PhpMyAdmin Access</h2>
 
-            <div class="info">
-                <p><strong>PhpMyAdmin URL:</strong></p>
-                <p><code>http://localhost/phpmyadmin/</code></p>
-                <p><strong>Login Credentials:</strong></p>
-                <p>Username: <code>root</code><br>
-                Password: <code>admin123</code></p>
-            </div>
+            <?php if (PHPMYADMIN_URL === ''): ?>
+                <div class="info">
+                    <strong>Belum dikonfigurasi.</strong><br>
+                    Isi <code>phpmyadmin_url</code> di <code>config/env.php</code>.
+                    Alamatnya bisa dilihat di aaPanel &rarr; Database &rarr; phpMyAdmin.
+                </div>
+            <?php else: ?>
+                <div class="info">
+                    <p><strong>Alamat:</strong></p>
+                    <p><code><?php echo htmlspecialchars(PHPMYADMIN_URL); ?></code></p>
+                    <p style="margin-top:.75rem"><strong>Login:</strong> pakai username dan
+                    password database yang Anda buat di menu <a href="databases.php">Databases</a>.</p>
+                </div>
+            <?php endif; ?>
 
-            <p style="margin-bottom: 1rem; color: #4a5568;">
-                PhpMyAdmin memberikan akses lengkap untuk mengelola database MySQL Anda secara visual.
-                Anda dapat membuat tabel, mengedit data, membuat backup, dan melakukan optimasi database.
-            </p>
-
-            <button class="btn" onclick="window.open('http://localhost/phpmyadmin/', '_blank')">
-                🔗 Buka PhpMyAdmin
-            </button>
+            <?php if (PHPMYADMIN_URL !== ''): ?>
+                <a class="btn" href="<?php echo htmlspecialchars(PHPMYADMIN_URL); ?>"
+                   target="_blank" rel="noopener noreferrer">🔗 Buka phpMyAdmin</a>
+            <?php endif; ?>
 
             <div style="margin-top: 2rem; padding: 1.5rem; background: #fef3c7; border-radius: 5px; border-left: 4px solid #f59e0b;">
                 <p style="color: #92400e; font-weight: 500; margin-bottom: 0.5rem;">⚠️ Catatan Penting</p>

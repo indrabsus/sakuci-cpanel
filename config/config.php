@@ -12,6 +12,10 @@ define('DB_NAME', $env['db_name'] ?? 'sakuci_cpanel');
 // Default relatif terhadap folder aplikasi, jadi tidak terikat Windows/Linux.
 define('PROJECTS_PATH', $env['projects_path'] ?? dirname(__DIR__) . '/projects');
 
+// Domain induk web siswa; kosong berarti tautan "Buka Web" disembunyikan.
+define('SITE_DOMAIN', $env['site_domain'] ?? '');
+define('PHPMYADMIN_URL', $env['phpmyadmin_url'] ?? '');
+
 // Penyaringan IP dijalankan paling awal: sebelum koneksi database, sebelum
 // sesi, dan sebelum sebaris keluaran pun dikirim.
 require_once __DIR__ . '/ip-guard.php';

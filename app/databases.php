@@ -1,6 +1,7 @@
 <?php
 include '../config/config.php';
 include '../config/auth.php';
+include '../config/mysql-admin.php';
 
 $user = require_login($conn);
 $user_id = $user['id'];
@@ -8,31 +9,62 @@ $username = $user['username'];
 $error = '';
 $success = '';
 
+$admin = mysql_admin_connect($env);
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $db_name = 'db_' . preg_replace('/[^a-zA-Z0-9_]/', '', $_POST['db_name'] ?? '');
+    $raw = strtolower(trim($_POST['db_name'] ?? ''));
+    $db_name = 'db_' . preg_replace('/[^a-z0-9_]/', '', $raw);
     $project_id = intval($_POST['project_id'] ?? 0);
 
-    if (empty($db_name) || $project_id <= 0) {
-        $error = '❌ Database name dan project harus diisi';
+    if ($raw === '' || $project_id <= 0) {
+        $error = '❌ Nama database dan project harus diisi';
+    } elseif (!valid_mysql_identifier($db_name)) {
+        $error = '❌ Nama hanya boleh huruf kecil, angka, dan garis bawah (minimal 3 karakter)';
+    } elseif ($admin === null) {
+        $error = '❌ Pembuatan database belum dikonfigurasi. Isi db_admin_user dan '
+               . 'db_admin_pass di config/env.php.';
     } else {
-        // Generate random username dan password
-        $db_user = substr($db_name, 0, 10) . '_' . substr(md5(uniqid()), 0, 5);
-        $db_pass = bin2hex(random_bytes(8));
+        // Nama user MySQL dibatasi 32 karakter, jadi tidak bisa sekadar
+        // memakai nama database apa adanya.
+        $db_user = substr($db_name, 0, 20) . '_' . substr(bin2hex(random_bytes(4)), 0, 5);
+        $db_pass = bin2hex(random_bytes(12));
 
-        $stmt = $conn->prepare("INSERT INTO db_list (project_id, user_id, db_name, db_host, db_port) VALUES (?, ?, ?, 'localhost', 3306)");
-        $stmt->bind_param("iis", $project_id, $user_id, $db_name);
+        $made = create_mysql_database($admin, $db_name, $db_user, $db_pass);
 
-        if ($stmt->execute()) {
-            $db_id = $conn->insert_id;
-
-            // Insert database user
-            $stmt2 = $conn->prepare("INSERT INTO db_users (db_id, username, password, privileges) VALUES (?, ?, ?, 'ALL')");
-            $stmt2->bind_param("iss", $db_id, $db_user, $db_pass);
-            $stmt2->execute();
-
-            $success = "✅ Database berhasil dibuat!<br>DB: <code>$db_name</code><br>User: <code>$db_user</code><br>Pass: <code>$db_pass</code>";
+        if (!$made['ok']) {
+            $error = '❌ ' . $made['error'];
         } else {
-            $error = "❌ Error: " . $conn->error;
+            try {
+                $stmt = $conn->prepare(
+                    "INSERT INTO db_list (project_id, user_id, db_name, db_host, db_port)
+                     VALUES (?, ?, ?, 'localhost', 3306)"
+                );
+                $stmt->bind_param("iis", $project_id, $user_id, $db_name);
+                $stmt->execute();
+
+                $stmt2 = $conn->prepare(
+                    "INSERT INTO db_users (db_id, username, password, privileges)
+                     VALUES (?, ?, ?, 'ALL')"
+                );
+                $db_id = $conn->insert_id;
+                $stmt2->bind_param("iss", $db_id, $db_user, $db_pass);
+                $stmt2->execute();
+
+                // Password ditampilkan sekali ini saja: yang tersimpan di
+                // db_users dipakai untuk mengingatkan siswa, bukan rahasia
+                // panel, tapi tetap tidak diulang di daftar.
+                $success = "✅ Database dibuat.<br>"
+                    . "Database: <code>" . htmlspecialchars($db_name) . "</code><br>"
+                    . "User: <code>" . htmlspecialchars($db_user) . "</code><br>"
+                    . "Password: <code>" . htmlspecialchars($db_pass) . "</code><br>"
+                    . "<strong>Catat sekarang</strong> -- password tidak ditampilkan lagi.";
+            } catch (mysqli_sql_exception $e) {
+                error_log('Gagal mencatat database: ' . $e->getMessage());
+                // Database sudah terlanjur dibuat di MySQL; buang lagi supaya
+                // tidak ada database yatim yang tak tercatat panel.
+                drop_mysql_database($admin, $db_name, $db_user);
+                $error = '❌ Gagal menyimpan catatan database.';
+            }
         }
     }
 }

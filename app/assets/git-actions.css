@@ -2,8 +2,13 @@
 .git-btn { padding: 0.5rem 1rem; background: #667eea; color: white; border: none; border-radius: 4px; font-size: 0.9rem; font-family: inherit; cursor: pointer; }
 .git-btn:hover:not(:disabled) { background: #5568d3; }
 .git-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.git-btn-danger { background: #a0aec0; margin-left: auto; }
+.git-btn-danger { background: #a0aec0; }
 .git-btn-danger:hover:not(:disabled) { background: #c53030; }
+.git-btn-open { background: #2f855a; text-decoration: none; }
+.git-btn-open:hover { background: #276749; }
+.git-btn-file { background: #4a5568; text-decoration: none; }
+.git-btn-file:hover { background: #2d3748; }
+a.git-btn { line-height: normal; }
 .git-status { font-size: 0.9rem; color: #666; }
 .git-status.running { color: #92400e; }
 .git-status.ok { color: #166534; }

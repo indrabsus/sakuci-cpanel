@@ -12,7 +12,9 @@ const POLL_TIMEOUT = 15 * 60 * 1000;
 
 document.addEventListener('click', function (e) {
     const btn = e.target.closest('.git-btn');
-    if (!btn) return;
+    // Tautan "Buka Web" dan "File" memakai kelas yang sama demi tampilan,
+    // tetapi tidak punya data-action dan harus dibiarkan berperilaku normal.
+    if (!btn || !btn.dataset.action) return;
 
     if (btn.dataset.action === 'delete') {
         deleteProject(btn);

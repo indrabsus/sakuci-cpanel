@@ -110,6 +110,12 @@ if ($result) {
                                 <button class="git-btn" data-action="clone">📥 Clone</button>
                                 <span class="git-status">Belum di-clone ke server</span>
                             <?php endif; ?>
+                            <?php if ($cloned && SITE_DOMAIN !== ''): ?>
+                                <?php $url = 'http://' . basename($project['local_path']) . '.' . SITE_DOMAIN; ?>
+                                <a class="git-btn git-btn-open" target="_blank" rel="noopener noreferrer"
+                                   href="<?php echo htmlspecialchars($url); ?>">🌐 Buka Web</a>
+                            <?php endif; ?>
+                            <a class="git-btn git-btn-file" href="files.php?project=<?php echo $project['id']; ?>">📁 File</a>
                             <button class="git-btn git-btn-danger" data-action="delete"
                                     data-name="<?php echo htmlspecialchars($project['name'], ENT_QUOTES); ?>">🗑 Hapus</button>
                         </div>
