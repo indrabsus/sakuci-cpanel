@@ -51,7 +51,9 @@ if ($result) {
         .project-info { color: #666; font-size: 0.9rem; margin-top: 0.5rem; }
         .logout { color: #e53e3e; }
     </style>
-    <link rel="stylesheet" href="assets/git-actions.css">
+    <?php // ?v=<waktu ubah> memaksa browser mengambil ulang begitu berkas berubah;
+          // tanpa ini cache 30 hari di .htaccess menyajikan versi lama. ?>
+    <link rel="stylesheet" href="assets/git-actions.css?v=<?php echo filemtime(__DIR__ . '/assets/git-actions.css'); ?>">
 </head>
 <body>
     <header>
@@ -120,6 +122,6 @@ if ($result) {
             <?php endif; ?>
         </div>
     </div>
-    <script src="assets/git-actions.js"></script>
+    <script src="assets/git-actions.js?v=<?php echo filemtime(__DIR__ . "/assets/git-actions.js"); ?>"></script>
 </body>
 </html>

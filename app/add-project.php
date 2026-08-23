@@ -78,7 +78,7 @@ if ($result) {
         .status-active { background: #dcfce7; color: #166534; }
         .status-inactive { background: #fee2e2; color: #991b1b; }
     </style>
-    <link rel="stylesheet" href="assets/git-actions.css">
+    <link rel="stylesheet" href="assets/git-actions.css?v=<?php echo filemtime(__DIR__ . "/assets/git-actions.css"); ?>">
 </head>
 <body>
     <header>
@@ -170,6 +170,8 @@ if ($result) {
                                 <button class="git-btn" data-action="clone">📥 Clone</button>
                                 <span class="git-status">Belum di-clone ke server</span>
                             <?php endif; ?>
+                            <button class="git-btn git-btn-danger" data-action="delete"
+                                    data-name="<?php echo htmlspecialchars($proj['name'], ENT_QUOTES); ?>">🗑 Hapus</button>
                         </div>
                         <pre class="git-output"></pre>
                     </div>
@@ -179,6 +181,6 @@ if ($result) {
             <?php endif; ?>
         </div>
     </div>
-    <script src="assets/git-actions.js"></script>
+    <script src="assets/git-actions.js?v=<?php echo filemtime(__DIR__ . "/assets/git-actions.js"); ?>"></script>
 </body>
 </html>
