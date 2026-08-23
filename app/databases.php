@@ -11,6 +11,54 @@ $success = '';
 
 $admin = mysql_admin_connect($env);
 
+// Penghapusan ditangani lebih dulu lalu dialihkan (pola POST-redirect-GET),
+// supaya menekan refresh tidak mengulang perintah DROP.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'hapus') {
+    $db_id = intval($_POST['db_id'] ?? 0);
+
+    $stmt = $conn->prepare(
+        "SELECT d.db_name, u.username AS db_user
+           FROM db_list d
+           LEFT JOIN db_users u ON u.db_id = d.id
+          WHERE d.id = ? AND d.user_id = ?"
+    );
+    $stmt->bind_param("ii", $db_id, $user_id);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+
+    if (!$row) {
+        $pesan = 'err|Database tidak ditemukan.';
+    } elseif ($admin === null) {
+        $pesan = 'err|Penghapusan butuh kredensial admin MySQL di config/env.php.';
+    } else {
+        $hapus = drop_mysql_database($admin, $row['db_name'], $row['db_user']);
+
+        if (!$hapus['ok']) {
+            $pesan = 'err|' . $hapus['error'];
+        } else {
+            // Baris db_users ikut terhapus lewat foreign key.
+            $del = $conn->prepare("DELETE FROM db_list WHERE id = ? AND user_id = ?");
+            $del->bind_param("ii", $db_id, $user_id);
+            $del->execute();
+
+            $pesan = 'ok|Database ' . $row['db_name'] . ' dihapus beserta seluruh isinya.';
+        }
+    }
+
+    header('Location: databases.php?pesan=' . urlencode($pesan));
+    exit;
+}
+
+if (isset($_GET['pesan']) && str_contains((string) $_GET['pesan'], '|')) {
+    [$jenis, $teks] = explode('|', (string) $_GET['pesan'], 2);
+    $teks = htmlspecialchars($teks);
+    if ($jenis === 'ok') {
+        $success = '✅ ' . $teks;
+    } else {
+        $error = '❌ ' . $teks;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $raw = strtolower(trim($_POST['db_name'] ?? ''));
     $db_name = 'db_' . preg_replace('/[^a-z0-9_]/', '', $raw);
@@ -111,6 +159,8 @@ if ($result) {
         .btn { display: inline-block; padding: 0.75rem 1.5rem; background: #667eea; color: white; text-decoration: none; border-radius: 5px; border: none; cursor: pointer; font-size: 1rem; font-weight: 500; }
         .btn:hover { background: #5568d3; }
         .btn-secondary { background: #718096; }
+        .btn-danger { background: #a0aec0; padding: .5rem 1rem; font-size: .9rem; }
+        .btn-danger:hover { background: #c53030; }
         .error { color: #e53e3e; background: #fed7d7; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; }
         .success { color: #22863a; background: #f6f8fa; border: 1px solid #28a745; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; }
         .db-item { background: #f7fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; }
@@ -183,6 +233,14 @@ if ($result) {
                             Host: <code><?php echo htmlspecialchars($db['db_host']); ?></code>:<code><?php echo $db['db_port']; ?></code><br>
                             Created: <?php echo date('d M Y H:i', strtotime($db['created_at'])); ?>
                         </div>
+                        <form method="POST" style="margin-top:.75rem"
+                              onsubmit="return confirm('Hapus database <?php echo htmlspecialchars($db['db_name'], ENT_QUOTES); ?>?
+
+SELURUH TABEL DAN DATANYA HILANG PERMANEN dan tidak bisa dikembalikan.');">
+                            <input type="hidden" name="action" value="hapus">
+                            <input type="hidden" name="db_id" value="<?php echo (int) $db['id']; ?>">
+                            <button type="submit" class="btn btn-danger">🗑 Hapus Database</button>
+                        </form>
                     </div>
                 <?php endforeach; ?>
             <?php else: ?>
