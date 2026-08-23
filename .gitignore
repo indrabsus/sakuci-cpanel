@@ -36,9 +36,8 @@ database/backups/
 uploads/
 public/uploads/
 
-# Cloned user projects -- kecuali .htaccess yang memblokir aksesnya
-projects/*
-!projects/.htaccess
+# Cloned user projects
+projects/
 cookies.txt
 
 # IDE
