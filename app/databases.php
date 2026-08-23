@@ -10,19 +10,24 @@ $error = '';
 $success = '';
 
 $admin = mysql_admin_connect($env);
+$isAdmin = is_admin($user);
 
 // Penghapusan ditangani lebih dulu lalu dialihkan (pola POST-redirect-GET),
 // supaya menekan refresh tidak mengulang perintah DROP.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'hapus') {
     $db_id = intval($_POST['db_id'] ?? 0);
 
-    $stmt = $conn->prepare(
-        "SELECT d.db_name, u.username AS db_user
-           FROM db_list d
-           LEFT JOIN db_users u ON u.db_id = d.id
-          WHERE d.id = ? AND d.user_id = ?"
-    );
-    $stmt->bind_param("ii", $db_id, $user_id);
+    // Admin boleh menghapus milik siswa mana pun.
+    $sqlCari = "SELECT d.db_name, d.user_id, u.username AS db_user
+                  FROM db_list d
+                  LEFT JOIN db_users u ON u.db_id = d.id
+                 WHERE d.id = ?" . ($isAdmin ? "" : " AND d.user_id = ?");
+    $stmt = $conn->prepare($sqlCari);
+    if ($isAdmin) {
+        $stmt->bind_param("i", $db_id);
+    } else {
+        $stmt->bind_param("ii", $db_id, $user_id);
+    }
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
 
@@ -37,8 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'hapus
             $pesan = 'err|' . $hapus['error'];
         } else {
             // Baris db_users ikut terhapus lewat foreign key.
+            $pemilik = (int) $row['user_id'];
             $del = $conn->prepare("DELETE FROM db_list WHERE id = ? AND user_id = ?");
-            $del->bind_param("ii", $db_id, $user_id);
+            $del->bind_param("ii", $db_id, $pemilik);
             $del->execute();
 
             $pesan = 'ok|Database ' . $row['db_name'] . ' dihapus beserta seluruh isinya.';
@@ -138,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Get projects
 $projects = [];
-$result = $conn->query("SELECT * FROM projects WHERE user_id = $user_id");
+$result = $conn->query("SELECT * FROM projects" . ($isAdmin ? "" : " WHERE user_id = $user_id"));
 if ($result) {
     while ($row = $result->fetch_assoc()) {
         $projects[] = $row;
@@ -147,7 +153,13 @@ if ($result) {
 
 // Get databases
 $databases = [];
-$result = $conn->query("SELECT db.*, pr.name as project_name FROM db_list db LEFT JOIN projects pr ON db.project_id = pr.id WHERE db.user_id = $user_id ORDER BY db.created_at DESC");
+$sqlDb = "SELECT db.*, pr.name AS project_name, us.username AS owner
+            FROM db_list db
+            LEFT JOIN projects pr ON db.project_id = pr.id
+            JOIN users us ON us.id = db.user_id"
+       . ($isAdmin ? "" : " WHERE db.user_id = $user_id")
+       . " ORDER BY db.created_at DESC";
+$result = $conn->query($sqlDb);
 if ($result) {
     while ($row = $result->fetch_assoc()) {
         $databases[] = $row;
@@ -201,6 +213,7 @@ if ($result) {
                 <a href="add-project.php">➕ Add Project</a>
                 <a href="databases.php">🗄️ Databases</a>
                 <a href="phpmyadmin.php">📊 PhpMyAdmin</a>
+                <?php if ($isAdmin): ?><a href="users.php">👥 Users</a><?php endif; ?>
             </div>
             <div>
                 <span>👤 <?php echo htmlspecialchars($username); ?></span>
@@ -248,7 +261,7 @@ if ($result) {
                     <div class="db-item">
                         <h3><?php echo htmlspecialchars($db['db_name']); ?></h3>
                         <div class="db-meta">
-                            Project: <strong><?php echo htmlspecialchars($db['project_name'] ?? '-'); ?></strong><br>
+                            Project: <strong><?php echo htmlspecialchars($db['project_name'] ?? '-'); ?></strong><?php if ($isAdmin): ?> &middot; Pemilik: <strong><?php echo htmlspecialchars($db['owner']); ?></strong><?php endif; ?><br>
                             Host: <code><?php echo htmlspecialchars($db['db_host']); ?></code>:<code><?php echo $db['db_port']; ?></code><br>
                             Created: <?php echo date('d M Y H:i', strtotime($db['created_at'])); ?>
                         </div>

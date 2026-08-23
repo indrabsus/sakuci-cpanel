@@ -80,12 +80,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="error"><?php echo $error; ?></div>
         <?php endif; ?>
 
-        <div class="info">
-            <strong>Test Account:</strong><br>
-            User: <code>admin</code><br>
-            Pass: <code>password123</code>
-        </div>
-
         <form method="POST">
             <div class="form-group">
                 <label>Username</label>

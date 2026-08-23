@@ -13,7 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$user_id = require_api_login($conn)['id'];
+$me = require_api_login($conn);
+$user_id = $me['id'];
 $project_id = intval($_POST['project_id'] ?? 0);
 
 if ($project_id <= 0) {
@@ -22,7 +23,7 @@ if ($project_id <= 0) {
     exit;
 }
 
-$project = find_project($conn, $project_id, $user_id);
+$project = find_project($conn, $project_id, $user_id, is_admin($me));
 if (!$project) {
     http_response_code(403);
     echo json_encode(['error' => 'Project not found']);
@@ -40,8 +41,11 @@ if (active_job($conn, $project_id)) {
 // Folder hasil clone sengaja TIDAK dihapus. Menghapus direktori berdasarkan
 // nilai dari database terlalu berisiko bila local_path pernah salah isi, dan
 // project lain bisa saja menunjuk folder yang sama. Berkasnya dibuang manual.
+// Memakai user_id dari baris project, bukan dari penghapus: admin boleh
+// menghapus milik siswa mana pun.
+$owner = (int) $project['user_id'];
 $stmt = $conn->prepare("DELETE FROM projects WHERE id = ? AND user_id = ?");
-$stmt->bind_param("ii", $project_id, $user_id);
+$stmt->bind_param("ii", $project_id, $owner);
 $stmt->execute();
 
 echo json_encode([

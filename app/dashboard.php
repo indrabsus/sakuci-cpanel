@@ -7,8 +7,14 @@ $user_id = $user['id'];
 $username = $user['username'];
 
 // Get projects
+// Admin melihat milik semua orang; siswa hanya miliknya sendiri.
+$admin = is_admin($user);
 $projects = [];
-$result = $conn->query("SELECT * FROM projects WHERE user_id = $user_id ORDER BY created_at DESC");
+$sql = "SELECT p.*, u.username AS owner FROM projects p
+        JOIN users u ON u.id = p.user_id"
+     . ($admin ? "" : " WHERE p.user_id = $user_id")
+     . " ORDER BY p.created_at DESC";
+$result = $conn->query($sql);
 if ($result) {
     while ($row = $result->fetch_assoc()) {
         $projects[] = $row;
@@ -17,7 +23,7 @@ if ($result) {
 
 // Get databases count
 $db_count = 0;
-$result = $conn->query("SELECT COUNT(*) as total FROM db_list WHERE user_id = $user_id");
+$result = $conn->query("SELECT COUNT(*) as total FROM db_list" . ($admin ? "" : " WHERE user_id = $user_id"));
 if ($result) {
     $db_count = $result->fetch_assoc()['total'];
 }
@@ -50,6 +56,7 @@ if ($result) {
         .project-name { font-weight: 600; color: #333; font-size: 1.1rem; }
         .project-info { color: #666; font-size: 0.9rem; margin-top: 0.5rem; }
         .logout { color: #e53e3e; }
+        .owner-tag { font-size: .78rem; font-weight: 500; background: #edf2f7; color: #4a5568; padding: .15rem .5rem; border-radius: 999px; margin-left: .5rem; vertical-align: middle; }
     </style>
     <?php // ?v=<waktu ubah> memaksa browser mengambil ulang begitu berkas berubah;
           // tanpa ini cache 30 hari di .htaccess menyajikan versi lama. ?>
@@ -67,6 +74,7 @@ if ($result) {
                 <a href="#projects">Projects</a>
                 <a href="databases.php">Databases</a>
                 <a href="phpmyadmin.php">PhpMyAdmin</a>
+                <?php if ($admin): ?><a href="users.php">👥 Users</a><?php endif; ?>
             </div>
             <a href="../index.php?logout=1" class="logout">Logout</a>
         </div>
@@ -91,7 +99,11 @@ if ($result) {
                     <?php foreach ($projects as $project): ?>
                     <?php $cloned = is_dir($project['local_path']); ?>
                     <div class="project-card" data-project="<?php echo $project['id']; ?>">
-                        <div class="project-name">📂 <?php echo htmlspecialchars($project['name']); ?></div>
+                        <div class="project-name">📂 <?php echo htmlspecialchars($project['name']); ?>
+                            <?php if ($admin): ?>
+                                <span class="owner-tag">👤 <?php echo htmlspecialchars($project['owner']); ?></span>
+                            <?php endif; ?>
+                        </div>
                         <div class="project-info">
                             🌐 <?php echo htmlspecialchars($project['domain'] ?? 'No domain'); ?><br>
                             📦 <?php echo htmlspecialchars($project['git_url']); ?><br>

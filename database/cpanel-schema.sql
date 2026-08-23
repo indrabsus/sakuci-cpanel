@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
   username   varchar(50)  NOT NULL,
   email      varchar(100) NOT NULL,
   password   varchar(255) NOT NULL,          -- hash bcrypt, bukan teks polos
+  role       enum('admin','user') NOT NULL DEFAULT 'user',
   created_at timestamp    NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY username (username),
@@ -68,8 +69,8 @@ CREATE TABLE IF NOT EXISTS db_users (
 --
 --   php tools/set-password.php admin
 --
-INSERT INTO users (username, email, password)
-SELECT 'admin', 'admin@localhost', '*'
+INSERT INTO users (username, email, password, role)
+SELECT 'admin', 'admin@localhost', '*', 'admin'
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin');
 
 -- Antrean pekerjaan git. PHP web di aaPanel dimatikan exec()-nya, jadi panel
@@ -91,3 +92,4 @@ CREATE TABLE IF NOT EXISTS job_queue (
   CONSTRAINT job_queue_ibfk_1 FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
   CONSTRAINT job_queue_ibfk_2 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

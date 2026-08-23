@@ -9,7 +9,7 @@ $user_id = $user['id'];
 $username = $user['username'];
 
 $project_id = intval($_GET['project'] ?? 0);
-$project = $project_id > 0 ? find_project($conn, $project_id, $user_id) : null;
+$project = $project_id > 0 ? find_project($conn, $project_id, $user_id, is_admin($user)) : null;
 
 if (!$project) {
     http_response_code(404);

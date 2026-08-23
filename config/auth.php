@@ -9,12 +9,31 @@ function current_user($conn)
         return null;
     }
 
-    $stmt = $conn->prepare("SELECT id, username FROM users WHERE id = ?");
+    $stmt = $conn->prepare("SELECT id, username, role FROM users WHERE id = ?");
     $stmt->bind_param("i", $_SESSION['user_id']);
     $stmt->execute();
     $user = $stmt->get_result()->fetch_assoc();
 
     return $user ?: null;
+}
+
+/** Admin melihat dan mengelola milik semua orang; siswa hanya miliknya. */
+function is_admin(?array $user): bool
+{
+    return ($user['role'] ?? '') === 'admin';
+}
+
+/** Menghentikan halaman yang hanya boleh dibuka admin. */
+function require_admin($conn): array
+{
+    $user = require_login($conn);
+
+    if (!is_admin($user)) {
+        http_response_code(403);
+        exit('Halaman ini hanya untuk admin.');
+    }
+
+    return $user;
 }
 
 function clear_session()

@@ -6,11 +6,22 @@
 // tools/worker.php yang dipanggil cron yang mengerjakan, lalu menulis hasilnya
 // kembali ke baris yang sama.
 
-/** Mengambil project milik user, atau null bila bukan miliknya. */
-function find_project($conn, int $project_id, int $user_id): ?array
+/**
+ * Mengambil project milik user, atau null bila bukan miliknya.
+ *
+ * $asAdmin melewati pemeriksaan kepemilikan. Nilainya HARUS berasal dari
+ * is_admin() atas data user yang dibaca ulang dari database, bukan dari
+ * sesi -- kalau tidak, peran admin bisa dipalsukan lewat sesi basi.
+ */
+function find_project($conn, int $project_id, int $user_id, bool $asAdmin = false): ?array
 {
-    $stmt = $conn->prepare("SELECT * FROM projects WHERE id = ? AND user_id = ?");
-    $stmt->bind_param("ii", $project_id, $user_id);
+    if ($asAdmin) {
+        $stmt = $conn->prepare("SELECT * FROM projects WHERE id = ?");
+        $stmt->bind_param("i", $project_id);
+    } else {
+        $stmt = $conn->prepare("SELECT * FROM projects WHERE id = ? AND user_id = ?");
+        $stmt->bind_param("ii", $project_id, $user_id);
+    }
     $stmt->execute();
 
     return $stmt->get_result()->fetch_assoc() ?: null;

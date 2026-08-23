@@ -5,7 +5,8 @@ include '../../config/jobs.php';
 
 header('Content-Type: application/json');
 
-$user_id = require_api_login($conn)['id'];
+$me = require_api_login($conn);
+$user_id = $me['id'];
 $project_id = intval($_GET['project_id'] ?? 0);
 
 if ($project_id <= 0) {
@@ -14,7 +15,7 @@ if ($project_id <= 0) {
     exit;
 }
 
-$project = find_project($conn, $project_id, $user_id);
+$project = find_project($conn, $project_id, $user_id, is_admin($me));
 if (!$project) {
     http_response_code(403);
     echo json_encode(['error' => 'Project not found']);
