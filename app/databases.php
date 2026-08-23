@@ -83,6 +83,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = '❌ ' . $made['error'];
         } else {
             try {
+                // Kedua baris dicatat dalam satu transaksi. Tanpa ini, kegagalan
+                // pada baris kedua meninggalkan baris pertama sebagai yatim, dan
+                // karena db_name bersifat unik, nama itu terkunci selamanya --
+                // percobaan membuat ulang selalu gagal.
+                $conn->begin_transaction();
+
                 $stmt = $conn->prepare(
                     "INSERT INTO db_list (project_id, user_id, db_name, db_host, db_port)
                      VALUES (?, ?, ?, 'localhost', 3306)"
@@ -90,13 +96,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->bind_param("iis", $project_id, $user_id, $db_name);
                 $stmt->execute();
 
+                // Dibaca SEGERA setelah execute: memanggil prepare() lebih dulu
+                // mereset insert_id menjadi 0, sehingga foreign key db_users
+                // gagal. Perilakunya berbeda antar versi MySQL.
+                $db_id = $conn->insert_id;
+
                 $stmt2 = $conn->prepare(
                     "INSERT INTO db_users (db_id, username, password, privileges)
                      VALUES (?, ?, ?, 'ALL')"
                 );
-                $db_id = $conn->insert_id;
                 $stmt2->bind_param("iss", $db_id, $db_user, $db_pass);
                 $stmt2->execute();
+
+                $conn->commit();
 
                 // Password ditampilkan sekali ini saja: yang tersimpan di
                 // db_users dipakai untuk mengingatkan siswa, bukan rahasia
@@ -108,10 +120,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     . "<strong>Catat sekarang</strong> -- password tidak ditampilkan lagi.";
             } catch (mysqli_sql_exception $e) {
                 error_log('Gagal mencatat database: ' . $e->getMessage());
-                // Database sudah terlanjur dibuat di MySQL; buang lagi supaya
-                // tidak ada database yatim yang tak tercatat panel.
+
+                // Batalkan kedua baris, lalu buang database yang telanjur
+                // dibuat -- sehingga tidak ada sisa di sisi mana pun dan nama
+                // itu bisa dipakai lagi.
+                try {
+                    $conn->rollback();
+                } catch (mysqli_sql_exception $ignored) {
+                }
                 drop_mysql_database($admin, $db_name, $db_user);
-                $error = '❌ Gagal menyimpan catatan database.';
+
+                $error = '❌ Gagal menyimpan catatan database. Coba lagi.';
             }
         }
     }
