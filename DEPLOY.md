@@ -1,189 +1,239 @@
-# Deploy cPanel Sakuci ke aaPanel
+# Pemasangan cPanel Sakuci untuk UKK
 
-Target: `cpanel.sakuci.id` di server Ubuntu 22.04 + aaPanel (Apache).
+Panduan memasang panel hosting siswa di Ubuntu + aaPanel (Apache).
+Target: `cpanel.sakuci.id`, web siswa di `*.uk.sakuci.id`.
 
-> **Baca dulu:** di server yang sama ada situs lain yang sudah live. Panel ini
-> sendiri tidak pernah memanggil shell -- permintaan git dititipkan ke tabel
-> `job_queue` dan dikerjakan worker cron (Langkah 5), sehingga `exec()` tetap
-> boleh mati di PHP web. Meski begitu, siapa pun yang bisa login tetap dapat
-> menyuruh server menjalankan git, jadi Langkah 6 jangan dilewatkan.
+Perkiraan waktu: 30-45 menit, sebagian besar menunggu DNS.
+
+> Di server ini ada situs lain yang sudah live. Semua perintah di bawah hanya
+> menyentuh `/www/wwwroot/cpanel.sakuci.id` dan konfigurasi Apache yang baru.
 
 ---
 
-## 1. Buat database (aaPanel)
+## Ringkasan
 
-**Database → Add database**
+| # | Langkah | Perlu apa |
+|---|---|---|
+| 1 | Record DNS wildcard | Akses pengaturan DNS domain |
+| 2 | Ambil kode terbaru | SSH |
+| 3 | Isi konfigurasi | SSH + password database |
+| 4 | Pasang vhost subdomain | SSH + root |
+| 5 | Daftarkan akun siswa | SSH |
+| 6 | Uji | Browser |
 
-| Kolom | Isi |
-|---|---|
-| Database name | `sakuci_cpanel` |
-| Username | `sakuci_cpanel` |
-| Password | klik *Generate*, lalu **salin** |
+---
 
-Simpan passwordnya di password manager. Jangan kirim lewat chat.
+## 1. Record DNS wildcard
 
-## 2. Ambil kode dari GitHub
+Di pengelola DNS domain `sakuci.id`, tambahkan **satu** record:
 
-**aaPanel → Terminal** (berjalan sebagai root):
+| Type | Name | Value | TTL |
+|---|---|---|---|
+| A | `*.uk` | `103.158.96.27` | default |
+
+Hasilnya `*.uk.sakuci.id`. Cukup sekali; semua project berikutnya otomatis
+tercakup tanpa menambah record lagi.
+
+Propagasi biasanya 5-30 menit. Cek dari komputer mana pun:
 
 ```bash
-cd /www/wwwroot/cpanel.sakuci.id
-rm -f index.html 404.html 502.html
-git init -q
-git remote add origin https://github.com/indrabsus/sakuci-cpanel.git
-git fetch -q origin main
-git checkout -f -b main origin/main
-chown -R www:www /www/wwwroot/cpanel.sakuci.id
+nslookup apasaja.uk.sakuci.id
 ```
 
-Dipakai `git init` + `fetch`, bukan `git clone`, karena folder situs sudah
-berisi `.well-known` (dipakai aaPanel untuk perpanjangan SSL) dan `.user.ini`.
-Cara ini menaruh kode di akar situs tanpa menyentuh keduanya, sehingga
-Document Root tidak perlu diubah dan sertifikat tetap bisa diperbarui.
+Bila menjawab `103.158.96.27`, DNS siap. Kalau masih `Non-existent domain`,
+tunggu dan ulangi. **Lanjutkan ke langkah 2 sambil menunggu** -- keduanya tidak
+saling bergantung.
+
+---
+
+## 2. Ambil kode terbaru
+
+```bash
+sudo bash -c 'cd /www/wwwroot/cpanel.sakuci.id && git pull -q && chown -R www:www . 2>/dev/null; git log --oneline -1'
+```
+
+Pastikan yang tercetak adalah commit terbaru. `chown` mungkin mengeluh soal
+`.user.ini` -- itu wajar, berkas tersebut sengaja dikunci aaPanel (`chattr +i`)
+dan memang tidak boleh diubah.
+
+---
 
 ## 3. Isi konfigurasi
 
 ```bash
-cd /www/wwwroot/cpanel.sakuci.id
-cp config/env.example.php config/env.php
-mkdir -p projects && chown www:www projects
-nano config/env.php
+sudo nano /www/wwwroot/cpanel.sakuci.id/config/env.php
 ```
 
-Isi sesuai database dari Langkah 1:
+Isinya harus menjadi seperti ini:
 
 ```php
+<?php
 return [
     'db_host' => 'localhost',
     'db_name' => 'sakuci_cpanel',
     'db_user' => 'sakuci_cpanel',
-    'db_pass' => 'PASSWORD_DARI_LANGKAH_1',
+    'db_pass' => 'PASSWORD_DATABASE_PANEL',
+
+    // Untuk membuat database siswa. Butuh wewenang CREATE DATABASE dan GRANT.
+    'db_admin_user' => 'root',
+    'db_admin_pass' => 'PASSWORD_ROOT_MYSQL',
+
     'projects_path' => '/www/wwwroot/cpanel.sakuci.id/projects',
+    'debug' => false,
+
+    'site_domain' => 'uk.sakuci.id',
+    'phpmyadmin_url' => 'http://103.158.96.27:888/phpmyadmin_529d01f771bb07df/',
 ];
 ```
 
-`projects_path` **harus** berada di dalam `open_basedir` situs
-(`/www/wwwroot/cpanel.sakuci.id/`), kalau tidak PHP menolak membacanya.
+Simpan dengan **Ctrl+O**, **Enter**, **Ctrl+X**.
 
-Kunci file berisi password ini agar hanya bisa dibaca web server:
+Yang perlu diperhatikan:
 
-```bash
-chown www:www config/env.php && chmod 640 config/env.php
-```
+- **`db_admin_pass`** adalah password root MySQL. Tanpa ini tombol "Buat
+  Database" tidak berfungsi -- karena membuat database butuh wewenang yang
+  sengaja tidak dimiliki user panel sehari-hari.
+- **`site_domain`** tanpa `http://` dan tanpa tanda bintang. Kosongkan bila
+  DNS belum siap; tombol "Buka Web" hanya akan disembunyikan.
+- **`debug` wajib `false`** di server. Bila `true`, galat PHP beserta path dan
+  nama user database akan tampil ke pengunjung.
 
-## 4. Impor skema dan buat user
-
-```bash
-mysql -h 127.0.0.1 -u sakuci_cpanel -p sakuci_cpanel < database/cpanel-schema.sql
-```
-
-Dipakai `-h 127.0.0.1` agar lewat TCP. Tanpa itu klien mencari socket di
-`/run/mysqld/mysqld.sock` sesuai `my.cnf`, padahal MySQL aaPanel membuatnya
-di `/tmp/mysql.sock`.
-
-Kalau memperbarui instalasi lama yang belum punya `job_queue`:
+Kunci berkasnya agar hanya terbaca web server:
 
 ```bash
-mysql -h 127.0.0.1 -u sakuci_cpanel -p sakuci_cpanel < database/migrations/001-job-queue.sql
+sudo chown www:www /www/wwwroot/cpanel.sakuci.id/config/env.php
+sudo chmod 640 /www/wwwroot/cpanel.sakuci.id/config/env.php
 ```
-
-Skema membuat user `admin` yang **belum punya password sama sekali** --
-login mustahil sampai Anda menetapkannya:
-
-```bash
-sudo php tools/set-password.php admin
-```
-
-Password diketik langsung di terminal, minimal 12 karakter, dan hanya hash
-bcrypt-nya yang tersimpan. `sudo` diperlukan karena `config/env.php` sengaja
-dikunci `640 www:www` sehingga user biasa tidak bisa membacanya.
-
-## 5. Pasang worker (wajib -- tanpa ini Clone/Pull tidak jalan)
-
-aaPanel mematikan `exec()` pada PHP web lewat `disable_functions`, jadi panel
-tidak menjalankan git sendiri. Panel hanya menitipkan permintaan di tabel
-`job_queue`; worker inilah yang mengerjakannya. PHP **CLI** memakai
-`php-cli.ini` terpisah yang masih mengizinkan `exec()`.
-
-Pasang cron sebagai **root** (agar berkas hasil git bisa di-`chown` ke `www`):
-
-```bash
-sudo crontab -e
-```
-
-Tambahkan satu baris:
-
-```
-* * * * * /usr/bin/php /www/wwwroot/cpanel.sakuci.id/tools/worker.php >> /var/log/sakuci-worker.log 2>&1
-```
-
-Uji manual lebih dulu:
-
-```bash
-sudo /usr/bin/php /www/wwwroot/cpanel.sakuci.id/tools/worker.php && echo "worker OK"
-```
-
-Worker memakai file lock, jadi cron tiap menit aman meski satu clone berjalan
-lebih lama dari satu menit.
-
-## 6. Amankan situs (jangan dilewati)
-
-**aaPanel → Website → cpanel.sakuci.id:**
-
-1. **Site Directory:** biarkan apa adanya
-   (`/www/wwwroot/cpanel.sakuci.id`, running directory `/`) -- kode sudah
-   berada di akar situs, jadi tidak ada yang perlu diubah di sini.
-2. **PHP version:** 8.2 atau 8.3
-3. **SSL → Force HTTPS: ON** -- tanpa ini password login terkirim polos
-4. **Security → IP whitelist:** isi IP Anda saja
-
-Butir 4 adalah pengaman utamanya. Kalau IP Anda berubah-ubah, pakai
-Basic Auth (**Website → Password access**) sebagai gantinya.
-
-## 7. Uji
-
-Buka `https://cpanel.sakuci.id`, login, lalu pastikan:
-
-- [ ] Halaman login tampil lewat HTTPS
-- [ ] Login berhasil dengan password baru
-- [ ] Dashboard memuat tanpa galat
-- [ ] Tambah project → klik Clone → status berubah jadi "menunggu giliran",
-      lalu "selesai" dalam waktu paling lama satu menit
-- [ ] `.git` **tidak** bisa diakses: `curl -I https://cpanel.sakuci.id/.git/config`
-      harus menjawab 403
-- [ ] Akses dari IP lain (mis. data seluler) **ditolak**
-
-Butir Clone menguji worker sekaligus: kalau status mentok di "menunggu
-giliran", berarti cron belum jalan. Dua butir terakhir membuktikan
-pembatasan akses benar-benar aktif.
 
 ---
 
-## Update berikutnya
+## 4. Pasang vhost subdomain
+
+Inilah yang membuat `budi.uk.sakuci.id` langsung menampilkan project `budi`
+tanpa konfigurasi per siswa.
+
+**a. Pastikan modul Apache aktif**
 
 ```bash
-cd /www/wwwroot/cpanel.sakuci.id && git pull
+grep -E "vhost_alias|rewrite_module" /www/server/apache/conf/httpd.conf | grep -v "^#"
 ```
 
-`config/env.php` dan `projects/` diabaikan git, jadi tidak akan tertimpa.
-
-## Kalau bermasalah
+Harus muncul dua baris `LoadModule`. Bila salah satu tidak ada atau masih
+diawali `#`, hapus tanda `#`-nya:
 
 ```bash
-tail -50 /www/wwwlogs/cpanel.sakuci.id-error_log
+sudo nano /www/server/apache/conf/httpd.conf
 ```
+
+**b. Salin berkas konfigurasi**
+
+```bash
+sudo cp /www/wwwroot/cpanel.sakuci.id/deploy/apache-wildcard.conf \
+        /www/server/panel/vhost/apache/000-wildcard-uk.conf
+```
+
+Awalan `000-` membuatnya dimuat lebih dulu daripada vhost situs lain.
+
+**c. Uji konfigurasi sebelum diterapkan**
+
+```bash
+sudo /www/server/apache/bin/httpd -t
+```
+
+Harus menjawab `Syntax OK`. **Jangan lanjut bila ada galat** -- Apache yang
+gagal start akan mematikan semua situs di server ini, termasuk yang sudah live.
+
+**d. Muat ulang**
+
+```bash
+sudo systemctl reload httpd
+```
+
+`reload` dipakai, bukan `restart`, agar situs lain tidak terputus.
+
+---
+
+## 5. Daftarkan akun siswa
+
+```bash
+cd /www/wwwroot/cpanel.sakuci.id
+sudo php tools/add-user.php --acak budi siti eka joko
+```
+
+Password acak tercetak sekali di layar -- **salin sekarang** untuk dibagikan,
+karena hanya hash-nya yang tersimpan.
+
+Untuk satu kelas, cukup deretkan semua nama dalam satu perintah. Nama harus
+huruf kecil, angka, atau garis bawah, 3-32 karakter.
+
+Bila ingin menentukan password sendiri:
+
+```bash
+sudo php tools/add-user.php budi
+```
+
+Mengganti password yang sudah ada:
+
+```bash
+sudo php tools/set-password.php budi
+```
+
+---
+
+## 6. Uji
+
+Login sebagai salah satu siswa di `https://cpanel.sakuci.id`, lalu:
+
+- [ ] **Add Project** -- isi domain `uji`, git URL repo publik mana saja
+- [ ] Klik **📥 Clone** -- status berubah "menunggu giliran" lalu "selesai"
+      dalam waktu paling lama satu menit
+- [ ] Klik **📁 File** -- daftar berkas muncul, `.env` bisa dibuka dan disimpan
+- [ ] Klik **🌐 Buka Web** -- `uji.uk.sakuci.id` menampilkan aplikasinya
+- [ ] Menu **Databases** -- buat database, catat kredensialnya
+- [ ] Menu **PhpMyAdmin** -- login dengan kredensial tadi, hanya database
+      itu yang terlihat
+
+Bila semua lolos, panel siap dipakai UKK.
+
+---
+
+## Bila bermasalah
+
+| Gejala | Penyebab & solusi |
+|---|---|
+| Status mentok "menunggu giliran" | Cron worker mati. Cek `ls -l /var/log/sakuci-worker.log`, harus diperbarui tiap menit |
+| Tombol "Buka Web" tidak muncul | `site_domain` kosong di `env.php`, atau project belum di-clone |
+| `budi.uk.sakuci.id` tidak bisa dibuka | DNS belum propagasi, atau vhost langkah 4 belum dimuat |
+| `budi.uk.sakuci.id` menampilkan situs lain | Vhost wildcard dimuat setelah vhost lain -- pastikan namanya diawali `000-` |
+| "Gagal membuat database" | `db_admin_user`/`db_admin_pass` salah atau kosong |
+| Tombol Buat Database bilang belum dikonfigurasi | `db_admin_user` belum diisi di `env.php` |
+| Halaman putih | Cek `tail -50 /www/wwwlogs/cpanel.sakuci.id-error_log` |
 
 Log worker:
 
 ```bash
-tail -50 /var/log/sakuci-worker.log
+sudo tail -50 /var/log/sakuci-worker.log
 ```
 
-| Gejala | Penyebab umum |
-|---|---|
-| Halaman putih | Cek error log; biasanya `env.php` salah isi |
-| "Database tidak dapat dihubungi" | Kredensial di `env.php` keliru |
-| Status mentok "menunggu giliran" | Cron worker belum terpasang atau gagal jalan |
-| Job `failed`, keluhan kredensial | Repo privat; git sengaja tidak menunggu prompt |
-| Project ter-clone tapi tak terbaca panel | `projects_path` di luar `open_basedir` |
-| Berkas hasil clone tak bisa ditulis web | Worker tidak jalan sebagai root, `chown` dilewati |
+Log Apache untuk web siswa:
+
+```bash
+sudo tail -50 /www/wwwlogs/uk-wildcard-error.log
+```
+
+---
+
+## Catatan keamanan
+
+Panel ini menyuruh server menjalankan `git` dan memberi siswa akses menyunting
+berkas. Yang perlu diketahui pengelola:
+
+- **Panel terbuka bagi siapa pun yang tahu alamatnya**, dijaga hanya oleh
+  password. Bila ingin dibatasi, isi `allowed_ips` di `env.php` (menerima CIDR),
+  atau pasang Basic Auth lewat aaPanel.
+- **Antar-siswa sudah terisolasi**: tiap siswa hanya melihat project dan
+  database miliknya sendiri, dan tidak bisa membaca database panel.
+- **Siswa tidak bisa keluar dari foldernya** lewat file manager; setiap path
+  diverifikasi dengan `realpath()`.
+- Web PHP tetap tanpa `exec()`. Perintah git dijalankan worker cron terpisah,
+  bukan oleh permintaan dari browser.
