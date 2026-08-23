@@ -108,6 +108,8 @@ if ($result) {
                                 <button class="git-btn" data-action="clone">📥 Clone</button>
                                 <span class="git-status">Belum di-clone ke server</span>
                             <?php endif; ?>
+                            <button class="git-btn git-btn-danger" data-action="delete"
+                                    data-name="<?php echo htmlspecialchars($project['name'], ENT_QUOTES); ?>">🗑 Hapus</button>
                         </div>
                         <pre class="git-output"></pre>
                     </div>

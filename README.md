@@ -48,6 +48,7 @@ app/
   api/clone.php           titipkan clone ke antrean (JSON)
   api/pull.php            titipkan pull ke antrean  (JSON)
   api/job-status.php      pantau status pekerjaan   (JSON)
+  api/delete-project.php  hapus project dari daftar (JSON)
 config/
   config.php              konstanta + koneksi + sesi
   jobs.php                antrean pekerjaan git

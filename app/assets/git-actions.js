@@ -12,10 +12,56 @@ const POLL_TIMEOUT = 15 * 60 * 1000;
 
 document.addEventListener('click', function (e) {
     const btn = e.target.closest('.git-btn');
-    if (btn) {
+    if (!btn) return;
+
+    if (btn.dataset.action === 'delete') {
+        deleteProject(btn);
+    } else {
         startGitAction(btn);
     }
 });
+
+async function deleteProject(btn) {
+    const card = btn.closest('[data-project]');
+    const projectId = card.dataset.project;
+    const name = btn.dataset.name || 'project ini';
+
+    if (!confirm(`Hapus "${name}" dari daftar?\n\nFolder hasil clone di server TIDAK ikut dihapus.`)) {
+        return;
+    }
+
+    const ui = cardUi(card);
+    ui.busy(true);
+    ui.status('running', '⏳ Menghapus…');
+
+    try {
+        const res = await fetch('api/delete-project.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'project_id=' + encodeURIComponent(projectId),
+        });
+
+        if (res.status === 401) {
+            ui.status('err', '❌ Sesi berakhir, mengalihkan ke login…');
+            setTimeout(() => location.href = '../index.php', 1200);
+            return;
+        }
+
+        const data = await res.json();
+
+        if (data.status === 'deleted') {
+            card.remove();
+            return;
+        }
+
+        ui.status('err', '❌ ' + (data.error || 'Gagal menghapus'));
+        ui.busy(false);
+    } catch (err) {
+        ui.status('err', '❌ Request gagal: ' + err.message);
+        ui.busy(false);
+    }
+}
 
 async function startGitAction(btn) {
     const card = btn.closest('[data-project]');
