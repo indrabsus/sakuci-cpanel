@@ -1,0 +1,16 @@
+# Folder ini dilayani oleh DUA vhost yang berbeda, dengan kebutuhan berlawanan:
+#
+#   cpanel.sakuci.id/projects/...   -> HARUS tertutup (isinya .git, config, .env)
+#   <nama>.ukk.sakuci.id            -> HARUS terbuka (inilah web siswanya)
+#
+# Dipakai "Require", bukan RewriteRule, karena aturan rewrite TIDAK diwariskan
+# ke subfolder yang punya .htaccess sendiri -- dan setiap project membawa
+# .htaccess-nya sendiri. Require tetap berlaku ke bawah.
+#
+# <If> membatasi penolakan itu hanya untuk host yang bukan subdomain siswa,
+# sehingga vhost wildcard tidak ikut terblokir. Menolak secara terbalik
+# (deny kecuali cocok) lebih aman daripada menyebut nama domain panel:
+# host apa pun yang tak dikenal ikut tertolak.
+<If "! (%{HTTP_HOST} -strmatch '*.ukk.sakuci.id')">
+    Require all denied
+</If>

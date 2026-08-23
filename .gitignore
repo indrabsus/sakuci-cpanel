@@ -37,7 +37,8 @@ uploads/
 public/uploads/
 
 # Cloned user projects
-projects/
+projects/*
+!projects/.htaccess
 cookies.txt
 
 # IDE

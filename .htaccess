@@ -10,13 +10,10 @@
     RewriteRule (^|/)\. - [F,L]
 
     # Folder yang tidak boleh dilayani langsung.
-    #
-    # projects/ diblokir DI SINI, bukan lewat .htaccess di dalamnya. Vhost
-    # wildcard menyajikan projects/<nama>/public sebagai DocumentRoot-nya
-    # sendiri, dan berkas ini berada di atas DocumentRoot itu sehingga tidak
-    # ikut terbaca -- persis yang diinginkan: tertutup lewat domain panel,
-    # terbuka lewat subdomain siswa.
-    RewriteRule ^(config|database|tools|logs|projects)/ - [F,L]
+    # projects/ TIDAK disebut di sini: aturan rewrite tidak diwariskan ke
+    # subfolder yang punya .htaccess sendiri, sedangkan setiap project membawa
+    # satu. Penjagaannya ada di projects/.htaccess memakai Require.
+    RewriteRule ^(config|database|tools|logs)/ - [F,L]
 
     # Dokumentasi dan dump SQL tidak perlu terbuka ke publik.
     RewriteRule \.(md|sql)$ - [F,L]
