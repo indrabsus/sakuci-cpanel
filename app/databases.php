@@ -153,9 +153,11 @@ if ($result) {
 
 // Get databases
 $databases = [];
-$sqlDb = "SELECT db.*, pr.name AS project_name, us.username AS owner
+$sqlDb = "SELECT db.*, pr.name AS project_name, us.username AS owner,
+                   du.username AS db_user, du.password AS db_pass
             FROM db_list db
             LEFT JOIN projects pr ON db.project_id = pr.id
+            LEFT JOIN db_users du ON du.db_id = db.id
             JOIN users us ON us.id = db.user_id"
        . ($isAdmin ? "" : " WHERE db.user_id = $user_id")
        . " ORDER BY db.created_at DESC";
@@ -190,6 +192,23 @@ if ($result) {
         .btn { display: inline-block; padding: 0.75rem 1.5rem; background: #667eea; color: white; text-decoration: none; border-radius: 5px; border: none; cursor: pointer; font-size: 1rem; font-weight: 500; }
         .btn:hover { background: #5568d3; }
         .btn-secondary { background: #718096; }
+        .akses { margin-top: .75rem; }
+        .akses summary { cursor: pointer; color: #667eea; font-weight: 500; font-size: .92rem; user-select: none; }
+        .akses summary:hover { text-decoration: underline; }
+        .akses[open] summary { margin-bottom: .75rem; }
+        /* Lipatannya diatur sendiri, tidak menumpang gaya bawaan browser:
+           kalau bawaan itu tidak diterapkan, password akan langsung terpampang
+           tanpa diklik. Sudah terjadi saat pengujian. */
+        .akses > *:not(summary) { display: none; }
+        .akses[open] > *:not(summary) { display: block; }
+        .akses-tabel { border-collapse: collapse; margin-bottom: .75rem; }
+        .akses-tabel th { text-align: left; padding: .25rem 1rem .25rem 0; font-weight: 500; color: #718096; font-size: .85rem; }
+        .akses-tabel td { padding: .25rem 0; }
+        .akses-judul { font-size: .85rem; color: #718096; margin-bottom: .35rem; }
+        .env-blok { background: #1a202c; color: #e2e8f0; padding: .85rem; border-radius: 5px; font-family: ui-monospace, Consolas, monospace; font-size: .82rem; line-height: 1.5; overflow-x: auto; white-space: pre; }
+        .btn-salin { margin-top: .5rem; padding: .35rem .9rem; font-size: .85rem; background: #4a5568; }
+        .btn-salin:hover { background: #2d3748; }
+        .akses-kosong { margin-top: .5rem; font-size: .88rem; color: #a0aec0; }
         .btn-danger { background: #a0aec0; padding: .5rem 1rem; font-size: .9rem; }
         .btn-danger:hover { background: #c53030; }
         .error { color: #e53e3e; background: #fed7d7; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; }
@@ -265,6 +284,35 @@ if ($result) {
                             Host: <code><?php echo htmlspecialchars($db['db_host']); ?></code>:<code><?php echo $db['db_port']; ?></code><br>
                             Created: <?php echo date('d M Y H:i', strtotime($db['created_at'])); ?>
                         </div>
+                        <?php if ($db['db_user']): ?>
+                            <details class="akses">
+                                <summary>🔑 Lihat Akses</summary>
+                                <table class="akses-tabel">
+                                    <tr><th>Host</th><td><code><?php echo htmlspecialchars($db['db_host']); ?></code></td></tr>
+                                    <tr><th>Port</th><td><code><?php echo (int) $db['db_port']; ?></code></td></tr>
+                                    <tr><th>Database</th><td><code><?php echo htmlspecialchars($db['db_name']); ?></code></td></tr>
+                                    <tr><th>Username</th><td><code><?php echo htmlspecialchars($db['db_user']); ?></code></td></tr>
+                                    <tr><th>Password</th><td><code><?php echo htmlspecialchars($db['db_pass']); ?></code></td></tr>
+                                </table>
+
+                                <p class="akses-judul">Salin ke <code>.env</code> project Anda:</p>
+                                <pre class="env-blok" id="env-<?php echo (int) $db['id']; ?>">DB_CONNECTION=mysql
+DB_HOST=<?php echo htmlspecialchars($db['db_host']); ?>
+
+DB_PORT=<?php echo (int) $db['db_port']; ?>
+
+DB_DATABASE=<?php echo htmlspecialchars($db['db_name']); ?>
+
+DB_USERNAME=<?php echo htmlspecialchars($db['db_user']); ?>
+
+DB_PASSWORD=<?php echo htmlspecialchars($db['db_pass']); ?></pre>
+                                <button type="button" class="btn btn-salin"
+                                        data-target="env-<?php echo (int) $db['id']; ?>">📋 Salin</button>
+                            </details>
+                        <?php else: ?>
+                            <p class="akses-kosong">Kredensial tidak tercatat untuk database ini.</p>
+                        <?php endif; ?>
+
                         <form method="POST" style="margin-top:.75rem"
                               onsubmit="return confirm('Hapus database <?php echo htmlspecialchars($db['db_name'], ENT_QUOTES); ?>?
 
@@ -280,5 +328,38 @@ SELURUH TABEL DAN DATANYA HILANG PERMANEN dan tidak bisa dikembalikan.');">
             <?php endif; ?>
         </div>
     </div>
+<script>
+// Menyalin blok .env ke papan klip. navigator.clipboard hanya tersedia pada
+// HTTPS atau localhost, jadi disediakan cara cadangan agar tetap berfungsi
+// saat panel diakses lewat http biasa.
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.btn-salin');
+    if (!btn) return;
+
+    const teks = document.getElementById(btn.dataset.target).textContent;
+    const selesai = () => {
+        const semula = btn.textContent;
+        btn.textContent = '✅ Tersalin';
+        setTimeout(() => btn.textContent = semula, 1500);
+    };
+
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(teks).then(selesai).catch(() => salinCadangan(teks, selesai));
+    } else {
+        salinCadangan(teks, selesai);
+    }
+});
+
+function salinCadangan(teks, selesai) {
+    const ta = document.createElement('textarea');
+    ta.value = teks;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); selesai(); } catch (err) { /* biarkan pengguna menyalin manual */ }
+    document.body.removeChild(ta);
+}
+</script>
 </body>
 </html>
