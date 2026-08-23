@@ -26,26 +26,121 @@ $error = '';
 $success = '';
 $relative = (string) ($_GET['path'] ?? '');
 
-// Simpan suntingan
+// Semua aksi tulis memakai POST lalu dialihkan (POST-redirect-GET), supaya
+// menekan refresh tidak mengulang penyimpanan, penghapusan, atau pembuatan.
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $aksi = $_POST['action'] ?? 'simpan';
     $relative = (string) ($_POST['path'] ?? '');
-    $target = project_path($root, $relative);
+    $kembaliKe = $relative;
+    $pesan = '';
 
-    if ($target === null || !is_file($target)) {
-        $error = '❌ Berkas tidak ditemukan.';
-    } elseif (!is_editable($target)) {
-        $error = '❌ Berkas ini tidak bisa disunting.';
-    } elseif (!is_writable($target)) {
-        $error = '❌ Berkas tidak bisa ditulis. Periksa kepemilikan berkas di server.';
-    } else {
-        // Normalkan CRLF supaya berkas tetap rapi di server Linux.
-        $isi = str_replace("\r\n", "\n", (string) ($_POST['content'] ?? ''));
+    if ($aksi === 'simpan') {
+        $target = project_path($root, $relative);
 
-        if (file_put_contents($target, $isi) === false) {
-            $error = '❌ Gagal menyimpan.';
+        if ($target === null || !is_file($target)) {
+            $pesan = 'err|Berkas tidak ditemukan.';
+        } elseif (!is_editable($target)) {
+            $pesan = 'err|Berkas ini tidak bisa disunting.';
+        } elseif (!is_writable($target)) {
+            $pesan = 'err|Berkas tidak bisa ditulis. Periksa kepemilikan berkas di server.';
         } else {
-            $success = '✅ Tersimpan ' . date('H:i:s');
+            // Browser mengirim akhir baris sebagai CRLF; disamakan ke LF supaya
+            // berkas tidak jadi campur aduk saat dibuka di server Linux.
+            $isi = str_replace("\r\n", "\n", (string) ($_POST['content'] ?? ''));
+            $pesan = file_put_contents($target, $isi) === false
+                ? 'err|Gagal menyimpan.'
+                : 'ok|Tersimpan.';
         }
+    }
+
+    if ($aksi === 'hapus') {
+        $target = project_path($root, $relative);
+        $akar = realpath($root);
+
+        if ($target === null) {
+            $pesan = 'err|Berkas tidak ditemukan.';
+        } elseif ($target === $akar) {
+            // Tanpa penjagaan ini, folder project bisa terhapus seluruhnya
+            // dari dalam file manager.
+            $pesan = 'err|Folder utama project tidak bisa dihapus dari sini.';
+        } else {
+            $nama = basename($target);
+            $kembaliKe = dirname($relative) === '.' ? '' : dirname($relative);
+
+            $pesan = delete_recursive($target)
+                ? 'ok|' . $nama . ' dihapus.'
+                : 'err|Gagal menghapus ' . $nama . '. Periksa izin berkas di server.';
+        }
+    }
+
+    if ($aksi === 'ganti_nama') {
+        $target = project_path($root, $relative);
+        $akar = realpath($root);
+        $namaBaru = trim((string) ($_POST['nama'] ?? ''));
+
+        if ($target === null) {
+            $pesan = 'err|Berkas tidak ditemukan.';
+        } elseif ($target === $akar) {
+            $pesan = 'err|Folder utama project tidak bisa diganti nama.';
+        } elseif (!valid_filename($namaBaru)) {
+            $pesan = 'err|Nama tidak valid. Tidak boleh mengandung / atau \\, dan tidak boleh . atau ..';
+        } else {
+            // Nama baru selalu digabung ke folder induk yang sama. Karena
+            // valid_filename() menolak pemisah path, hasilnya mustahil keluar
+            // dari folder tempat berkas itu berada.
+            $tujuan = dirname($target) . DIRECTORY_SEPARATOR . $namaBaru;
+            $kembaliKe = dirname($relative) === '.' ? '' : dirname($relative);
+
+            if (file_exists($tujuan)) {
+                $pesan = 'err|' . $namaBaru . ' sudah ada.';
+            } else {
+                $pesan = @rename($target, $tujuan)
+                    ? 'ok|Diganti nama menjadi ' . $namaBaru . '.'
+                    : 'err|Gagal mengganti nama. Periksa izin berkas di server.';
+            }
+        }
+    }
+
+    if ($aksi === 'buat_berkas' || $aksi === 'buat_folder') {
+        $nama = trim((string) ($_POST['nama'] ?? ''));
+        $indukPath = project_path($root, $relative);
+
+        if ($indukPath === null || !is_dir($indukPath)) {
+            $pesan = 'err|Folder tujuan tidak ditemukan.';
+        } elseif (!valid_filename($nama)) {
+            $pesan = 'err|Nama tidak valid. Tidak boleh mengandung garis miring, dan tidak boleh . atau ..';
+        } else {
+            $tujuan = $indukPath . DIRECTORY_SEPARATOR . $nama;
+
+            if (file_exists($tujuan)) {
+                $pesan = 'err|' . $nama . ' sudah ada.';
+            } elseif (!is_writable($indukPath)) {
+                $pesan = 'err|Folder ini tidak bisa ditulis. Periksa izin di server.';
+            } elseif ($aksi === 'buat_folder') {
+                $pesan = @mkdir($tujuan, 0755)
+                    ? 'ok|Folder ' . $nama . ' dibuat.'
+                    : 'err|Gagal membuat folder.';
+            } else {
+                $pesan = @file_put_contents($tujuan, '') !== false
+                    ? 'ok|Berkas ' . $nama . ' dibuat.'
+                    : 'err|Gagal membuat berkas.';
+            }
+        }
+    }
+
+    header('Location: files.php?project=' . $project_id
+        . '&path=' . urlencode($kembaliKe)
+        . '&pesan=' . urlencode($pesan));
+    exit;
+}
+
+if (isset($_GET['pesan']) && str_contains((string) $_GET['pesan'], '|')) {
+    [$jenis, $teks] = explode('|', (string) $_GET['pesan'], 2);
+    $teks = htmlspecialchars($teks);
+    if ($jenis === 'ok') {
+        $success = '✅ ' . $teks;
+    } else {
+        $error = '❌ ' . $teks;
     }
 }
 
@@ -108,6 +203,14 @@ $webUrl = SITE_DOMAIN !== '' ? 'http://' . basename($root) . '.' . SITE_DOMAIN :
         .alert-err { background: #fff5f5; color: #822727; border: 1px solid #feb2b2; }
         .editor-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: .75rem; flex-wrap: wrap; }
         .fname { font-family: ui-monospace, Consolas, monospace; font-weight: 600; }
+        .buat-bar { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .inline-form { display: flex; gap: .4rem; background: white; padding: .6rem; border-radius: 8px; }
+        .inline-form input[type=text] { padding: .45rem .6rem; border: 1px solid #e2e8f0; border-radius: 5px; font-size: .88rem; font-family: inherit; width: 11rem; }
+        .btn-kecil { padding: .45rem .9rem; font-size: .85rem; }
+        form.inline { display: inline; }
+        .btn-ikon { background: none; border: none; cursor: pointer; font-size: .95rem; opacity: .35; padding: .2rem .35rem; border-radius: 4px; }
+        .btn-ikon:hover { opacity: 1; background: #edf2f7; }
+        .btn-hapus:hover { background: #fed7d7; }
     </style>
 </head>
 <body>
@@ -138,12 +241,27 @@ $webUrl = SITE_DOMAIN !== '' ? 'http://' . basename($root) . '.' . SITE_DOMAIN :
     <?php if ($success): ?><div class="alert alert-ok"><?php echo $success; ?></div><?php endif; ?>
 
     <?php if ($isDir): ?>
+        <div class="buat-bar">
+            <form method="POST" class="inline-form">
+                <input type="hidden" name="action" value="buat_berkas">
+                <input type="hidden" name="path" value="<?php echo htmlspecialchars($relative, ENT_QUOTES); ?>">
+                <input type="text" name="nama" placeholder="nama-berkas.php" required>
+                <button type="submit" class="btn btn-kecil">📄 Buat Berkas</button>
+            </form>
+            <form method="POST" class="inline-form">
+                <input type="hidden" name="action" value="buat_folder">
+                <input type="hidden" name="path" value="<?php echo htmlspecialchars($relative, ENT_QUOTES); ?>">
+                <input type="text" name="nama" placeholder="nama-folder" required>
+                <button type="submit" class="btn btn-kecil btn-secondary">📁 Buat Folder</button>
+            </form>
+        </div>
+
         <div class="panel">
             <table>
-                <thead><tr><th>Nama</th><th class="num">Ukuran</th><th class="num">Diubah</th></tr></thead>
+                <thead><tr><th>Nama</th><th class="num">Ukuran</th><th class="num">Diubah</th><th></th></tr></thead>
                 <tbody>
                 <?php if ($relative !== ''): ?>
-                    <tr><td colspan="3">
+                    <tr><td colspan="4">
                         <a href="?project=<?php echo $project_id; ?>&path=<?php echo urlencode(dirname($relative) === '.' ? '' : dirname($relative)); ?>">📂 ..</a>
                     </td></tr>
                 <?php endif; ?>
@@ -159,11 +277,37 @@ $webUrl = SITE_DOMAIN !== '' ? 'http://' . basename($root) . '.' . SITE_DOMAIN :
                         </td>
                         <td class="num muted"><?php echo $it['dir'] ? '—' : human_size($it['size']); ?></td>
                         <td class="num muted"><?php echo $it['mtime'] ? date('d/m/y H:i', $it['mtime']) : '—'; ?></td>
+                        <td class="num">
+                            <form method="POST" class="inline" onsubmit="
+                                    var b = prompt('Nama baru:', <?php echo htmlspecialchars(json_encode($it['name']), ENT_QUOTES); ?>);
+                                    if (b === null || b.trim() === '') return false;
+                                    this.nama.value = b.trim();
+                                    return true;">
+                                <input type="hidden" name="action" value="ganti_nama">
+                                <input type="hidden" name="path" value="<?php echo htmlspecialchars($p, ENT_QUOTES); ?>">
+                                <input type="hidden" name="nama" value="">
+                                <button type="submit" class="btn-ikon" title="Ganti nama">✏️</button>
+                            </form>
+                            <form method="POST" class="inline" onsubmit="return confirm(<?php
+                                echo htmlspecialchars(json_encode(
+                                    ($it['dir']
+                                        ? "Hapus folder \"{$it['name']}\" BESERTA SELURUH ISINYA?"
+                                        : "Hapus berkas \"{$it['name']}\"?")
+                                    . "
+
+Tidak bisa dikembalikan."
+                                ), ENT_QUOTES);
+                            ?>);">
+                                <input type="hidden" name="action" value="hapus">
+                                <input type="hidden" name="path" value="<?php echo htmlspecialchars($p, ENT_QUOTES); ?>">
+                                <button type="submit" class="btn-ikon btn-hapus" title="Hapus">🗑</button>
+                            </form>
+                        </td>
                     </tr>
                 <?php endforeach; ?>
 
                 <?php if (!$items): ?>
-                    <tr><td colspan="3" class="muted">Folder kosong.</td></tr>
+                    <tr><td colspan="4" class="muted">Folder kosong.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>

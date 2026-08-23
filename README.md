@@ -49,6 +49,8 @@ app/
   api/pull.php            titipkan pull ke antrean  (JSON)
   api/job-status.php      pantau status pekerjaan   (JSON)
   api/delete-project.php  hapus project dari daftar (JSON)
+  files.php               file manager per project
+  users.php               manajemen akun (admin)
 config/
   config.php              konstanta + koneksi + sesi
   jobs.php                antrean pekerjaan git

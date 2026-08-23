@@ -98,6 +98,54 @@ function is_editable(string $path): bool
     return !str_contains($chunk, "\0");
 }
 
+/**
+ * Nama berkas atau folder baru yang aman.
+ *
+ * Pemisah path ditolak supaya nama tidak bisa dipakai berpindah folder --
+ * "a/../../x" hanya boleh terbentuk lewat navigasi, bukan lewat kotak nama.
+ * Titik satu dan dua ditolak karena keduanya merujuk direktori, bukan nama.
+ * Nama berawalan titik tetap diizinkan: siswa memang perlu membuat .env.
+ */
+function valid_filename(string $name): bool
+{
+    $name = trim($name);
+
+    if ($name === '' || $name === '.' || $name === '..' || strlen($name) > 255) {
+        return false;
+    }
+
+    return !preg_match('#[/\\\\\0]#', $name);
+}
+
+/**
+ * Menghapus berkas atau folder beserta isinya.
+ *
+ * Symlink diperiksa lebih dulu dan dihapus sebagai berkas, bukan ditelusuri --
+ * tanpa itu, symlink yang menunjuk ke luar project bisa membuat penghapusan
+ * merambat ke folder lain di server.
+ */
+function delete_recursive(string $path): bool
+{
+    if (is_link($path) || is_file($path)) {
+        return @unlink($path);
+    }
+
+    if (!is_dir($path)) {
+        return false;
+    }
+
+    foreach (scandir($path) ?: [] as $name) {
+        if ($name === '.' || $name === '..') {
+            continue;
+        }
+        if (!delete_recursive($path . DIRECTORY_SEPARATOR . $name)) {
+            return false;
+        }
+    }
+
+    return @rmdir($path);
+}
+
 function human_size(int $bytes): string
 {
     if ($bytes < 1024) {
