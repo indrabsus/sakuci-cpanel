@@ -122,3 +122,26 @@ Perintah terminal (`worker.php`, `set-password.php`) tidak ikut disaring.
 
 **Salah isi akan mengunci Anda sendiri.** Pemulihannya lewat SSH: kosongkan
 kembali `allowed_ips`, tanpa perlu restart apa pun.
+
+## Menayangkan project yang sudah di-clone
+
+Folder `projects/` adalah ruang kerja, **bukan** direktori publik, dan sengaja
+ditutup dari domain panel lewat `projects/.htaccess`. Menayangkan project dari
+sana akan membuka `.git` beserta seluruh berkas di luar `public/`.
+
+Cara yang benar: buatkan **situs tersendiri** untuk tiap project.
+
+Di aaPanel:
+
+1. **Website → Add site**, isi domainnya (mis. `app.contoh.id`)
+2. Buka pengaturan situs itu → **Site Directory**
+   - Site directory: `/www/wwwroot/cpanel.sakuci.id/projects/<nama>`
+   - Running directory: `/public`
+3. **SSL → Let's Encrypt**, lalu **Force HTTPS**
+
+Pengaturan **Running directory** itu kuncinya: Sakuci menaruh satu-satunya
+berkas yang boleh diakses browser di `public/`, dan sisanya (`core/`,
+`config/`, `.env`) harus berada di luar jangkauan web.
+
+Setelah itu panel tetap mengurus kodenya -- tombol Pull memperbarui isi folder,
+dan situs langsung menyajikan versi terbaru tanpa pengaturan tambahan.
