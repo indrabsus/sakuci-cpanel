@@ -12,6 +12,11 @@ define('DB_NAME', $env['db_name'] ?? 'sakuci_cpanel');
 // Default relatif terhadap folder aplikasi, jadi tidak terikat Windows/Linux.
 define('PROJECTS_PATH', $env['projects_path'] ?? dirname(__DIR__) . '/projects');
 
+// Penyaringan IP dijalankan paling awal: sebelum koneksi database, sebelum
+// sesi, dan sebelum sebaris keluaran pun dikirim.
+require_once __DIR__ . '/ip-guard.php';
+enforce_ip_allowlist($env['allowed_ips'] ?? []);
+
 // Di server, galat tidak boleh tampil ke pengunjung: isinya memuat path,
 // nama user database, dan stack trace. Aktifkan hanya lewat 'debug' di env.php.
 // Catatan: php_flag di .htaccess tidak berlaku bila PHP dijalankan sebagai

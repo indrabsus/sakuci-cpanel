@@ -52,6 +52,7 @@ app/
 config/
   config.php              konstanta + koneksi + sesi
   jobs.php                antrean pekerjaan git
+  ip-guard.php            pembatasan akses per IP
   auth.php                verifikasi user ke database
   env.php                 kredensial -- diabaikan git
 database/cpanel-schema.sql
@@ -97,3 +98,27 @@ Panduan pemasangan di server ada di [DEPLOY.md](DEPLOY.md).
 Perubahan lokal yang belum di-commit di folder project **akan hilang**. Ini
 disengaja: server harus mencerminkan isi repo, bukan menyimpan suntingan
 langsung.
+
+## Membatasi akses per IP
+
+Panel ini menjalankan git di server, jadi sebaiknya tidak terbuka bebas.
+Cara terbaik adalah menyaringnya di web server. Bila itu tidak tersedia,
+isi `allowed_ips` di `config/env.php`:
+
+```php
+'allowed_ips' => ['103.158.96.27', '2404:c0:ab00::/48'],
+```
+
+Menerima alamat persis maupun CIDR, IPv4 dan IPv6. Larik kosong mematikan
+pembatasan. Permintaan dari IP lain dijawab `403` sebelum halaman login
+sempat tampil.
+
+Yang dipakai hanya `REMOTE_ADDR`. Header `X-Forwarded-For` sengaja diabaikan
+karena dikirim oleh klien dan bisa dipalsukan siapa pun -- mempercayainya
+justru meniadakan pembatasan ini. Bila kelak dipasang CDN atau proxy di depan
+panel, bagian ini harus ditinjau ulang.
+
+Perintah terminal (`worker.php`, `set-password.php`) tidak ikut disaring.
+
+**Salah isi akan mengunci Anda sendiri.** Pemulihannya lewat SSH: kosongkan
+kembali `allowed_ips`, tanpa perlu restart apa pun.
