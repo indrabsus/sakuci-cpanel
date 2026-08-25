@@ -1,6 +1,7 @@
 <?php
 include '../config/config.php';
 include '../config/auth.php';
+include '../config/git-url.php';
 
 $user = require_login($conn);
 $user_id = $user['id'];
@@ -28,12 +29,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $local_path = PROJECTS_PATH . '/' . $domain;
 
+        // Bentuk baku dipakai sebagai pembanding; URL asli tetap disimpan
+        // untuk ditampilkan. Tanpa pembakuan, repo yang sama bisa masuk
+        // berkali-kali hanya dengan mengubah .git atau huruf besar-kecil.
+        $git_key = normalize_git_url($git_url);
+
         try {
             $stmt = $conn->prepare(
-                "INSERT INTO projects (user_id, name, domain, git_url, git_branch, local_path, status)
-                 VALUES (?, ?, ?, ?, ?, ?, 'active')"
+                "INSERT INTO projects (user_id, name, domain, git_url, git_key, git_branch, local_path, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'active')"
             );
-            $stmt->bind_param("isssss", $user_id, $name, $domain, $git_url, $git_branch, $local_path);
+            $stmt->bind_param("issssss", $user_id, $name, $domain, $git_url, $git_key, $git_branch, $local_path);
             $stmt->execute();
 
             // Diarahkan ke dashboard: di sanalah tombol Clone, Buka Web, dan
@@ -45,10 +51,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (mysqli_sql_exception $e) {
             error_log('add-project insert failed: ' . $e->getMessage());
 
-            // Indeks unik pada local_path yang menahan domain kembar.
-            $pesan = str_contains($e->getMessage(), 'Duplicate')
-                ? 'err|Domain "' . $domain . '" sudah dipakai. Pilih nama lain.'
-                : 'err|Gagal menyimpan project. Coba lagi.';
+            // Dua indeks unik yang bisa memicu: domain dan repo.
+            if (str_contains($e->getMessage(), 'unik_git_key')) {
+                $pesan = 'err|Repo GitHub ini sudah dipakai project lain. '
+                       . 'Satu repo hanya boleh dipakai satu project.';
+            } elseif (str_contains($e->getMessage(), 'Duplicate')) {
+                $pesan = 'err|Domain "' . $domain . '" sudah dipakai. Pilih nama lain.';
+            } else {
+                $pesan = 'err|Gagal menyimpan project. Coba lagi.';
+            }
         }
     }
 

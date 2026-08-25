@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS projects (
   name        varchar(100) NOT NULL,
   domain      varchar(255) DEFAULT NULL,
   git_url     varchar(255) NOT NULL,
+  -- Bentuk baku dari git_url ("host/pemilik/nama"), dipakai agar satu repo
+  -- hanya bisa dipakai satu project di seluruh panel.
+  git_key     varchar(255) NOT NULL DEFAULT '',
   git_branch  varchar(50)  DEFAULT 'main',
   local_path  varchar(255) NOT NULL,
   description text,
@@ -33,6 +36,7 @@ CREATE TABLE IF NOT EXISTS projects (
   PRIMARY KEY (id),
   -- Unik agar dua project tidak menunjuk folder dan subdomain yang sama.
   UNIQUE KEY unik_local_path (local_path),
+  UNIQUE KEY unik_git_key (git_key),
   KEY idx_user_id (user_id),
   CONSTRAINT projects_ibfk_1 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
