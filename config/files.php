@@ -118,6 +118,31 @@ function valid_filename(string $name): bool
 }
 
 /**
+ * Membuktikan sebuah path berada DI DALAM folder induk, bukan sama dengan
+ * induknya dan bukan di luarnya.
+ *
+ * Dipakai sebelum penghapusan folder project. Menghapus direktori berdasarkan
+ * nilai dari database terlalu berbahaya tanpa pembuktian ini: satu baris
+ * local_path yang keliru bisa membuat folder lain ikut terhapus. realpath()
+ * menyelesaikan "..", "." dan symlink lebih dulu, dan kesamaan persis dengan
+ * induk ditolak agar folder projects/ sendiri tidak pernah bisa dihapus.
+ */
+function path_inside(string $parent, string $path): bool
+{
+    $p = realpath($parent);
+    $t = realpath($path);
+
+    if ($p === false || $t === false) {
+        return false;
+    }
+
+    $p = rtrim(str_replace('\\', '/', $p), '/');
+    $t = str_replace('\\', '/', $t);
+
+    return $t !== $p && str_starts_with($t, $p . '/');
+}
+
+/**
  * Menghapus berkas atau folder beserta isinya.
  *
  * Symlink diperiksa lebih dulu dan dihapus sebagai berkas, bukan ditelusuri --

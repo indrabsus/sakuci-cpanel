@@ -28,7 +28,7 @@ async function deleteProject(btn) {
     const projectId = card.dataset.project;
     const name = btn.dataset.name || 'project ini';
 
-    if (!confirm(`Hapus "${name}" dari daftar?\n\nFolder hasil clone di server TIDAK ikut dihapus.`)) {
+    if (!confirm(`Hapus project "${name}"?\n\nSELURUH FILE-nya di server ikut terhapus permanen, termasuk perubahan yang belum di-push ke GitHub.\n\nTidak bisa dikembalikan.`)) {
         return;
     }
 
@@ -53,6 +53,11 @@ async function deleteProject(btn) {
         const data = await res.json();
 
         if (data.status === 'deleted') {
+            // Folder bisa gagal dihapus meski baris database sudah hilang;
+            // beri tahu daripada diam-diam meninggalkan sisa di server.
+            if (!data.folder_terhapus && data.note) {
+                alert(data.note);
+            }
             card.remove();
             return;
         }

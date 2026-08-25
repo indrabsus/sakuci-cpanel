@@ -2,6 +2,7 @@
 include '../../config/config.php';
 include '../../config/auth.php';
 include '../../config/jobs.php';
+include '../../config/files.php';
 
 header('Content-Type: application/json');
 
@@ -38,9 +39,6 @@ if (active_job($conn, $project_id)) {
     exit;
 }
 
-// Folder hasil clone sengaja TIDAK dihapus. Menghapus direktori berdasarkan
-// nilai dari database terlalu berisiko bila local_path pernah salah isi, dan
-// project lain bisa saja menunjuk folder yang sama. Berkasnya dibuang manual.
 // Memakai user_id dari baris project, bukan dari penghapus: admin boleh
 // menghapus milik siswa mana pun.
 $owner = (int) $project['user_id'];
@@ -48,9 +46,33 @@ $stmt = $conn->prepare("DELETE FROM projects WHERE id = ? AND user_id = ?");
 $stmt->bind_param("ii", $project_id, $owner);
 $stmt->execute();
 
+// Folder hasil clone ikut dibuang, tetapi hanya setelah terbukti berada di
+// dalam PROJECTS_PATH. Tanpa pembuktian itu, satu baris local_path yang keliru
+// bisa membuat folder lain di server ikut terhapus.
+//
+// Baris database sengaja dihapus lebih dulu: bila penghapusan folder gagal,
+// project tetap hilang dari panel dan siswa tidak terjebak pada baris yang
+// tidak bisa dibuang.
+$path = $project['local_path'];
+$folderTerhapus = false;
+$catatan = 'Folder tidak ditemukan di server.';
+
+if (is_dir($path)) {
+    if (!path_inside(PROJECTS_PATH, $path)) {
+        error_log('Menolak menghapus folder di luar PROJECTS_PATH: ' . $path);
+        $catatan = 'Folder tidak dihapus karena berada di luar folder project.';
+    } elseif (delete_recursive($path)) {
+        $folderTerhapus = true;
+        $catatan = 'Folder beserta isinya ikut dihapus.';
+    } else {
+        error_log('Gagal menghapus folder project: ' . $path);
+        $catatan = 'Folder gagal dihapus. Periksa izin berkas di server.';
+    }
+}
+
 echo json_encode([
-    'status'     => 'deleted',
-    'message'    => 'Project dihapus dari daftar.',
-    'local_path' => $project['local_path'],
-    'note'       => 'Folder di server tidak ikut dihapus.',
+    'status'          => 'deleted',
+    'message'         => 'Project dihapus.',
+    'folder_terhapus' => $folderTerhapus,
+    'note'            => $catatan,
 ]);
