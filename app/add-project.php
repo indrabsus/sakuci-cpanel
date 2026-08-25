@@ -2,10 +2,10 @@
 include '../config/config.php';
 include '../config/auth.php';
 include '../config/git-url.php';
+include 'partials/layout.php';
 
 $user = require_login($conn);
 $user_id = $user['id'];
-$username = $user['username'];
 $error = '';
 $success = '';
 
@@ -17,15 +17,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $git_url = trim($_POST['git_url'] ?? '');
     $git_branch = trim($_POST['git_branch'] ?? 'main');
 
-    // Domain dinormalkan lebih dulu, bukan sekadar dibersihkan saat membentuk
+    // Alamat dinormalkan lebih dulu, bukan sekadar dibersihkan saat membentuk
     // path. Kalau tidak, "My-App" dan "myapp" tampil berbeda di daftar padahal
     // menunjuk folder dan subdomain yang sama.
     $domain = strtolower(preg_replace('/[^a-zA-Z0-9-]/', '', $domain));
 
     if (empty($name) || empty($domain) || empty($git_url)) {
-        $pesan = 'err|Semua field harus diisi.';
+        $pesan = 'err|Semua kolom harus diisi.';
     } elseif (!preg_match('/^[a-z][a-z0-9-]{2,29}$/', $domain)) {
-        $pesan = 'err|Domain harus 3-30 karakter, diawali huruf, hanya huruf kecil, angka, dan tanda hubung.';
+        $pesan = 'err|Alamat harus 3-30 karakter, diawali huruf, hanya huruf kecil, angka, dan tanda hubung.';
     } else {
         $local_path = PROJECTS_PATH . '/' . $domain;
 
@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute();
 
             // Diarahkan ke dashboard: di sanalah tombol Clone, Buka Web, dan
-            // File berada, jadi siswa langsung bisa melanjutkan.
+            // Berkas berada, jadi siswa langsung bisa melanjutkan.
             header('Location: dashboard.php?pesan=' . urlencode(
                 'ok|Project "' . $name . '" ditambahkan. Klik Clone untuk mengambil kodenya.'
             ));
@@ -51,12 +51,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (mysqli_sql_exception $e) {
             error_log('add-project insert failed: ' . $e->getMessage());
 
-            // Dua indeks unik yang bisa memicu: domain dan repo.
+            // Dua indeks unik yang bisa memicu: alamat dan repo.
             if (str_contains($e->getMessage(), 'unik_git_key')) {
-                $pesan = 'err|Repo GitHub ini sudah dipakai project lain. '
+                $pesan = 'err|Repo ini sudah dipakai project lain. '
                        . 'Satu repo hanya boleh dipakai satu project.';
             } elseif (str_contains($e->getMessage(), 'Duplicate')) {
-                $pesan = 'err|Domain "' . $domain . '" sudah dipakai. Pilih nama lain.';
+                $pesan = 'err|Alamat "' . $domain . '" sudah dipakai. Pilih nama lain.';
             } else {
                 $pesan = 'err|Gagal menyimpan project. Coba lagi.';
             }
@@ -70,107 +70,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if (isset($_GET['pesan']) && str_contains((string) $_GET['pesan'], '|')) {
     [$jenis, $teks] = explode('|', (string) $_GET['pesan'], 2);
     if ($jenis === 'ok') {
-        $success = '✅ ' . htmlspecialchars($teks);
+        $success = htmlspecialchars($teks);
     } else {
-        $error = '❌ ' . htmlspecialchars($teks);
+        $error = htmlspecialchars($teks);
     }
 }
 
+$contohDomain = SITE_DOMAIN !== '' ? SITE_DOMAIN : 'contoh.id';
+
+layout_start('Tambah Project', 'Ambil project Sakuci Framework dari repositori Git', 'add', $user);
 ?>
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Add Project - Sakuci cPanel</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto; background: #f5f7fa; }
-        header { background: #667eea; color: white; padding: 1.5rem; }
-        header h1 { font-size: 1.5rem; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-        .nav { background: white; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; }
-        .nav a { margin-right: 1.5rem; text-decoration: none; color: #667eea; font-weight: 500; }
-        .nav a:hover { text-decoration: underline; }
-        .section { background: white; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; }
-        .section h2 { margin-bottom: 1.5rem; color: #333; }
-        .form-group { margin-bottom: 1.5rem; }
-        label { display: block; margin-bottom: 0.5rem; color: #333; font-weight: 500; }
-        input, textarea { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem; font-family: inherit; }
-        input:focus, textarea:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
-        .btn { display: inline-block; padding: 0.75rem 1.5rem; background: #667eea; color: white; text-decoration: none; border-radius: 5px; border: none; cursor: pointer; font-size: 1rem; font-weight: 500; }
-        .btn:hover { background: #5568d3; }
-        .btn-secondary { background: #718096; }
-        .btn-secondary:hover { background: #4a5568; }
-        .error { color: #e53e3e; background: #fed7d7; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; }
-        .success { color: #22863a; background: #f6f8fa; border: 1px solid #28a745; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; }
-        .project-item { background: #f7fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; }
-        .project-item h3 { color: #333; margin-bottom: 0.5rem; }
-        .project-meta { color: #666; font-size: 0.9rem; }
-        .status-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 3px; font-size: 0.85rem; font-weight: 500; }
-        .status-active { background: #dcfce7; color: #166534; }
-        .status-inactive { background: #fee2e2; color: #991b1b; }
-    </style>
-    <link rel="stylesheet" href="assets/git-actions.css?v=<?php echo filemtime(__DIR__ . "/assets/git-actions.css"); ?>">
-</head>
-<body>
-    <header>
-        <h1>🚀 Sakuci cPanel</h1>
-        <p>Add Project from GitHub</p>
-    </header>
 
-    <div class="container">
-        <div class="nav">
-            <div>
-                <a href="dashboard.php">📊 Dashboard</a>
-                <a href="add-project.php">➕ Add Project</a>
-                <a href="databases.php">🗄️ Databases</a>
-                <a href="phpmyadmin.php">📊 PhpMyAdmin</a>
-            </div>
-            <div>
-                <span>👤 <?php echo htmlspecialchars($username); ?></span>
-                <a href="../index.php?logout=1" class="btn btn-secondary" style="margin-left: 1rem; display: inline-block;">Logout</a>
-            </div>
+<?php if ($error): ?><div class="note note-err"><?php echo $error; ?></div><?php endif; ?>
+<?php if ($success): ?><div class="note note-ok"><?php echo $success; ?></div><?php endif; ?>
+
+<div class="card" style="max-width:640px">
+    <div class="card-h">
+        <div>
+            <h2>Project Baru</h2>
+            <p>Hanya repositori Sakuci Framework yang bisa dihosting di sini</p>
         </div>
-
-        <div class="section">
-            <h2>➕ Tambah Project Baru</h2>
-
-            <?php if ($error): ?>
-                <div class="error"><?php echo $error; ?></div>
-            <?php endif; ?>
-
-            <?php if ($success): ?>
-                <div class="success"><?php echo $success; ?></div>
-            <?php endif; ?>
-
-            <form method="POST">
-                <div class="form-group">
-                    <label>Nama Project</label>
-                    <input type="text" name="name" placeholder="Contoh: My Awesome App" required>
-                </div>
-
-                <div class="form-group">
-                    <label>Domain/Subdomain</label>
-                    <input type="text" name="domain" placeholder="Contoh: myapp" required>
-                    <small style="color: #666; display: block; margin-top: 0.5rem;">Digunakan untuk folder lokal dan URL</small>
-                </div>
-
-                <div class="form-group">
-                    <label>GitHub Repository URL</label>
-                    <input type="url" name="git_url" placeholder="Contoh: https://github.com/username/repo.git" required>
-                </div>
-
-                <div class="form-group">
-                    <label>Branch (Default: main)</label>
-                    <input type="text" name="git_branch" placeholder="main" value="main">
-                </div>
-
-                <button type="submit" class="btn">➕ Tambah Project</button>
-            </form>
-        </div>
-
     </div>
-    <script src="assets/git-actions.js?v=<?php echo filemtime(__DIR__ . "/assets/git-actions.js"); ?>"></script>
-</body>
-</html>
+    <div class="card-b">
+        <form method="POST">
+            <div class="field">
+                <label for="f-nama">Nama Project</label>
+                <input id="f-nama" type="text" name="name" placeholder="Toko Online" required>
+                <div class="hint">Bebas, hanya untuk memudahkan Anda mengenalinya.</div>
+            </div>
+
+            <div class="field">
+                <label for="f-domain">Alamat</label>
+                <input id="f-domain" type="text" name="domain" placeholder="tokoonline" required
+                       pattern="[A-Za-z][A-Za-z0-9-]{2,29}">
+                <div class="hint">
+                    Web akan tampil di <code>alamat.<?php echo htmlspecialchars($contohDomain); ?></code>.
+                    Huruf, angka, dan tanda hubung. 3&ndash;30 karakter.
+                </div>
+            </div>
+
+            <div class="field">
+                <label for="f-url">URL Repositori</label>
+                <input id="f-url" type="url" name="git_url" required
+                       placeholder="https://github.com/nama/repo.git">
+                <div class="hint">Repositori harus dapat diakses publik.</div>
+            </div>
+
+            <div class="field">
+                <label for="f-branch">Branch</label>
+                <input id="f-branch" type="text" name="git_branch" value="main" placeholder="main">
+            </div>
+
+            <button type="submit" class="btn"><?php echo ikon('plus'); ?>Tambah Project</button>
+            <a class="btn btn-2" href="dashboard.php">Batal</a>
+        </form>
+    </div>
+</div>
+
+<?php layout_end(); ?>

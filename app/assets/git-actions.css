@@ -1,40 +1,103 @@
-.git-actions { margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
-.git-btn { padding: 0.5rem 1rem; background: #667eea; color: white; border: none; border-radius: 4px; font-size: 0.9rem; font-family: inherit; cursor: pointer; }
-.git-btn:hover:not(:disabled) { background: #5568d3; }
-.git-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.git-btn-danger { background: #a0aec0; }
-.git-btn-danger:hover:not(:disabled) { background: #c53030; }
-.git-btn-open { background: #2f855a; text-decoration: none; }
-.git-btn-open:hover { background: #276749; }
-.git-btn-file { background: #4a5568; text-decoration: none; }
-.git-btn-file:hover { background: #2d3748; }
-a.git-btn { line-height: normal; }
-.git-status { font-size: 0.9rem; color: #666; display: inline-flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
-.git-status.running { color: #92400e; }
+/* Kartu project dan tombol aksi git. */
+
+.proyek {
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 1rem 1.1rem;
+    background: var(--surface);
+    transition: border-color .12s, background .12s;
+}
+.proyek:hover { border-color: #d3d8e0; }
+.proyek.sedang-proses { border-color: #e0cfa8; background: #fffdf8; }
+
+.proyek-h { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.proyek-n { font-size: .95rem; font-weight: 600; letter-spacing: -.01em; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.proyek-m { color: var(--ink-3); margin-top: .18rem; word-break: break-all; }
+
+.proyek-d {
+    display: flex; gap: 2rem; flex-wrap: wrap;
+    margin: .85rem 0;
+    padding: .7rem 0;
+    border-top: 1px solid var(--line-soft);
+    border-bottom: 1px solid var(--line-soft);
+}
+.proyek-d dt { font-size: .71rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); font-weight: 600; }
+.proyek-d dd { font-size: .85rem; margin-top: .1rem; }
+.proyek-d dd a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.proyek-d dd a:hover { text-decoration: underline; }
+
+/* ---------- Baris tombol ---------- */
+
+.git-actions { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; }
+.git-spacer { flex: 1 1 auto; }
+
+.git-btn {
+    display: inline-flex; align-items: center; gap: .35rem;
+    padding: .4rem .8rem;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    background: var(--surface);
+    color: var(--ink);
+    font-family: inherit; font-size: .81rem; font-weight: 550;
+    line-height: 1.4;
+    cursor: pointer; text-decoration: none;
+    transition: background .12s, border-color .12s, color .12s;
+}
+.git-btn:hover:not(:disabled) { background: var(--line-soft); border-color: #d3d8e0; }
+.git-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Aksi utama tiap kartu diberi bobot, sisanya netral -- supaya jelas mana
+   langkah berikutnya tanpa membuat semua tombol berteriak. */
+.git-btn[data-action="clone"],
+.git-btn[data-action="pull"] {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+}
+.git-btn[data-action="clone"]:hover:not(:disabled),
+.git-btn[data-action="pull"]:hover:not(:disabled) {
+    background: var(--accent-2); border-color: var(--accent-2);
+}
+
+.git-btn-danger { color: var(--danger); }
+.git-btn-danger:hover:not(:disabled) { background: var(--danger-bg); border-color: #e8cdca; }
+
+/* ---------- Keadaan proses ---------- */
+
+.git-status { font-size: .81rem; color: var(--ink-3); display: inline-flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
+.git-status.running { color: var(--warn); }
+.git-status.ok { color: var(--accent-2); }
+.git-status.err { color: var(--danger); }
 
 /* Cincin berputar sebagai tanda proses masih hidup. Animasi CSS dipilih agar
-   tetap berjalan mulus tanpa bergantung pada siklus pemantauan. */
+   tetap mulus tanpa bergantung pada siklus pemantauan. */
 .spinner {
-    width: .85rem; height: .85rem; flex: none;
-    border: 2px solid rgba(146, 64, 14, .25);
-    border-top-color: #92400e;
+    width: .8rem; height: .8rem; flex: none;
+    border: 2px solid rgba(138,90,18,.22);
+    border-top-color: var(--warn);
     border-radius: 50%;
     animation: putar .7s linear infinite;
 }
 @keyframes putar { to { transform: rotate(360deg); } }
 
 /* Bagi yang mematikan animasi karena alasan kenyamanan, cincin tetap terlihat
-   sebagai penanda meski tidak berputar. */
+   sebagai penanda meski berputar lambat. */
 @media (prefers-reduced-motion: reduce) {
     .spinner { animation-duration: 3s; }
 }
 
-.git-catatan { display: block; width: 100%; color: #a0aec0; font-size: .78rem; }
+.git-catatan { display: block; width: 100%; color: var(--ink-3); font-size: .76rem; }
 
-/* Kartu diredupkan selama proses agar jelas bagian mana yang sedang bekerja. */
-.project-card.sedang-proses,
-.project-item.sedang-proses { background: #fffdf7; border-color: #fbd38d; }
-.git-status.ok { color: #166534; }
-.git-status.err { color: #991b1b; }
-.git-output { display: none; margin-top: 0.75rem; padding: 0.75rem; background: #1a202c; color: #e2e8f0; border-radius: 4px; font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem; white-space: pre-wrap; overflow: auto; max-height: 200px; }
+.git-output {
+    display: none;
+    margin-top: .7rem;
+    padding: .7rem .85rem;
+    background: #14171f;
+    color: #cdd3e0;
+    border-radius: var(--r);
+    font-family: "SFMono-Regular", ui-monospace, Consolas, monospace;
+    font-size: .78rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow: auto;
+    max-height: 200px;
+}
 .git-output.show { display: block; }

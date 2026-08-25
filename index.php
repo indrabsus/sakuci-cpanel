@@ -16,7 +16,7 @@ if (current_user($conn)) {
     exit;
 }
 
-$error = isset($_GET['expired']) ? '❌ Sesi Anda sudah tidak berlaku. Silakan login kembali.' : '';
+$error = isset($_GET['expired']) ? 'Sesi Anda sudah tidak berlaku. Silakan login kembali.' : '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
@@ -28,10 +28,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $sisa = sisa_blokir($conn, $ip);
 
     if ($sisa > 0) {
-        $error = '❌ Terlalu banyak percobaan gagal. Coba lagi dalam '
+        $error = 'Terlalu banyak percobaan gagal. Coba lagi dalam '
                . sebut_durasi($sisa) . '.';
     } elseif (empty($username) || empty($password)) {
-        $error = '❌ Username dan password harus diisi';
+        $error = 'Username dan password harus diisi';
     } else {
         $stmt = $conn->prepare("SELECT id, password FROM users WHERE username = ?");
         $stmt->bind_param("s", $username);
@@ -58,55 +58,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 AND waktu > (NOW() - INTERVAL " . LOGIN_JENDELA . " SECOND)"
         )->fetch_assoc()['n'];
 
-        $error = '❌ Username atau password salah.'
+        $error = 'Username atau password salah.'
                . ($tersisa > 0 && $tersisa <= 2 ? ' Sisa ' . $tersisa . ' percobaan.' : '');
     }
 }
 
+$v = fn(string $f) => $f . '?v=' . @filemtime(__DIR__ . '/app/assets/' . $f);
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sakuci cPanel - Login</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-        .login-box { background: white; padding: 3rem; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); width: 100%; max-width: 400px; }
-        h1 { color: #333; margin-bottom: 0.5rem; font-size: 1.8rem; }
-        .subtitle { color: #666; margin-bottom: 2rem; font-size: 0.9rem; }
-        .form-group { margin-bottom: 1.5rem; }
-        label { display: block; margin-bottom: 0.5rem; color: #333; font-weight: 500; }
-        input { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem; }
-        input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
-        button { width: 100%; padding: 0.75rem; background: #667eea; color: white; border: none; border-radius: 5px; font-size: 1rem; font-weight: 600; cursor: pointer; }
-        button:hover { background: #5568d3; }
-        .error { color: #e53e3e; margin-bottom: 1rem; padding: 0.75rem; background: #fed7d7; border-radius: 5px; }
-        .info { color: #744210; margin-bottom: 1rem; padding: 0.75rem; background: #feebc8; border-radius: 5px; font-size: 0.9rem; }
-        .info code { background: white; padding: 0.1rem 0.3rem; border-radius: 3px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Masuk &middot; Sakuci cPanel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;550;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app/assets/<?php echo $v('panel.css'); ?>">
+<link rel="stylesheet" href="app/assets/<?php echo $v('login.css'); ?>">
 </head>
-<body>
-    <div class="login-box">
-        <h1>🚀 Sakuci cPanel</h1>
-        <p class="subtitle">Development Control Panel</p>
+<body class="masuk">
 
+<div class="masuk-kotak">
+    <div class="masuk-kepala">
+        <h1>Sakuci cPanel</h1>
+        <p>Panel hosting untuk project siswa</p>
+    </div>
+
+    <div class="masuk-isi">
         <?php if ($error): ?>
-            <div class="error"><?php echo $error; ?></div>
+            <div class="note note-err"><?php echo $error; ?></div>
         <?php endif; ?>
 
         <form method="POST">
-            <div class="form-group">
-                <label>Username</label>
-                <input type="text" name="username" required autofocus>
+            <div class="field">
+                <label for="m-user">Nama Pengguna</label>
+                <input id="m-user" type="text" name="username" required autofocus
+                       autocomplete="username" autocapitalize="none" spellcheck="false">
             </div>
-            <div class="form-group">
-                <label>Password</label>
-                <input type="password" name="password" required>
+
+            <div class="field">
+                <label for="m-pin">PIN</label>
+                <input id="m-pin" class="pin" type="password" name="password" required
+                       inputmode="numeric" autocomplete="current-password"
+                       maxlength="32" placeholder="······">
             </div>
-            <button type="submit">Login</button>
+
+            <button type="submit" class="btn">Masuk</button>
         </form>
     </div>
+</div>
+
 </body>
 </html>

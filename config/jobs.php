@@ -83,8 +83,8 @@ function job_message(array $job): string
     $label = $job['action'] === 'clone' ? 'Clone' : 'Pull';
 
     return match ($job['status']) {
-        'pending' => "$label menunggu giliran…",
-        'running' => "$label sedang berjalan…",
+        'pending' => "$label menunggu giliran",
+        'running' => "$label sedang berjalan",
         'success' => "$label selesai.",
         'failed'  => "$label gagal.",
         default   => $label,

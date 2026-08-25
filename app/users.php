@@ -1,6 +1,7 @@
 <?php
 include '../config/config.php';
 include '../config/auth.php';
+include 'partials/layout.php';
 
 /**
  * Membuat PIN enam angka.
@@ -108,9 +109,9 @@ if (isset($_GET['pesan']) && str_contains((string) $_GET['pesan'], '|')) {
     if ($bagian[0] === 'baru' && count($bagian) === 3) {
         $akunBaru = ['username' => $bagian[1], 'password' => $bagian[2]];
     } elseif ($bagian[0] === 'ok') {
-        $success = '✅ ' . htmlspecialchars($bagian[1]);
+        $success = htmlspecialchars($bagian[1]);
     } else {
-        $error = '❌ ' . htmlspecialchars($bagian[1]);
+        $error = htmlspecialchars($bagian[1]);
     }
 }
 
@@ -125,118 +126,71 @@ $q = $conn->query(
 while ($row = $q->fetch_assoc()) {
     $users[] = $row;
 }
+
+layout_start('Pengguna', 'Kelola akun siswa dan administrator', 'users', $me);
 ?>
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Users - Sakuci cPanel</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto; background: #f5f7fa; color: #2d3748; }
-        header { background: #667eea; color: white; padding: 1.5rem; }
-        header h1 { font-size: 1.5rem; }
-        header p { font-size: .9rem; opacity: .9; }
-        .container { max-width: 1100px; margin: 0 auto; padding: 2rem; }
-        .nav { background: white; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; }
-        .nav a { margin-right: 1.5rem; text-decoration: none; color: #667eea; font-weight: 500; }
-        .section { background: white; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; }
-        .section h2 { margin-bottom: 1.25rem; font-size: 1.15rem; }
-        label { display: block; margin-bottom: .4rem; font-weight: 500; font-size: .92rem; }
-        input, select { padding: .65rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem; font-family: inherit; }
-        .row { display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; }
-        .btn { padding: .65rem 1.3rem; background: #667eea; color: white; border: none; border-radius: 5px; font-size: .95rem; font-weight: 500; cursor: pointer; font-family: inherit; }
-        .btn:hover { background: #5568d3; }
-        .btn-kecil { padding: .35rem .8rem; font-size: .85rem; }
-        .btn-abu { background: #718096; }
-        .btn-abu:hover { background: #4a5568; }
-        .btn-merah { background: #a0aec0; }
-        .btn-merah:hover { background: #c53030; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: .7rem .75rem; border-bottom: 1px solid #edf2f7; font-size: .92rem; }
-        th { background: #f7fafc; font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; color: #4a5568; }
-        tr:last-child td { border-bottom: none; }
-        .tag { font-size: .72rem; padding: .15rem .55rem; border-radius: 999px; font-weight: 600; }
-        .tag-admin { background: #fef3c7; color: #92400e; }
-        .tag-user { background: #e6fffa; color: #234e52; }
-        .alert { padding: .8rem 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: .93rem; }
-        .alert-ok { background: #f0fff4; color: #22543d; border: 1px solid #9ae6b4; }
-        .alert-err { background: #fff5f5; color: #822727; border: 1px solid #feb2b2; }
-        .kredensial { background: #fffbeb; border: 1px solid #fbbf24; padding: 1.25rem; border-radius: 6px; margin-bottom: 1.5rem; }
-        .kredensial code { background: white; padding: .25rem .6rem; border-radius: 4px; font-size: 1.05rem; font-weight: 600; }
-        .muted { color: #a0aec0; }
-        form.inline { display: inline; }
-    </style>
-</head>
-<body>
-<header>
-    <h1>👥 Manajemen User</h1>
-    <p>Masuk sebagai <?php echo htmlspecialchars($username); ?> (admin)</p>
-</header>
 
-<div class="container">
-    <div class="nav">
-        <div>
-            <a href="dashboard.php">📊 Dashboard</a>
-            <a href="add-project.php">➕ Add Project</a>
-            <a href="databases.php">🗄️ Databases</a>
-            <a href="phpmyadmin.php">📊 PhpMyAdmin</a>
-            <a href="users.php">👥 Users</a>
-        </div>
-        <a href="../index.php?logout=1" style="color:#e53e3e">Logout</a>
+<?php if ($error): ?><div class="note note-err"><?php echo $error; ?></div><?php endif; ?>
+<?php if ($success): ?><div class="note note-ok"><?php echo $success; ?></div><?php endif; ?>
+
+<?php if ($akunBaru): ?>
+    <div class="note note-warn">
+        <strong>Kredensial untuk <?php echo htmlspecialchars($akunBaru['username']); ?></strong><br>
+        Pengguna <code><?php echo htmlspecialchars($akunBaru['username']); ?></code>
+        &nbsp;&middot;&nbsp; PIN <code><?php echo htmlspecialchars($akunBaru['password']); ?></code><br>
+        <span class="dim">Catat sekarang &mdash; hanya sidik hashnya yang tersimpan, jadi PIN ini
+        tidak dapat ditampilkan lagi. Bila terlewat, gunakan tombol Reset.</span>
     </div>
+<?php endif; ?>
 
-    <?php if ($error): ?><div class="alert alert-err"><?php echo $error; ?></div><?php endif; ?>
-    <?php if ($success): ?><div class="alert alert-ok"><?php echo $success; ?></div><?php endif; ?>
-
-    <?php if ($akunBaru): ?>
-        <div class="kredensial">
-            <strong>Password untuk <?php echo htmlspecialchars($akunBaru['username']); ?>:</strong><br>
-            <p style="margin:.6rem 0">
-                Username <code><?php echo htmlspecialchars($akunBaru['username']); ?></code>
-                &nbsp; Password <code><?php echo htmlspecialchars($akunBaru['password']); ?></code>
-            </p>
-            <span class="muted" style="font-size:.88rem">
-                Catat sekarang &mdash; hanya hash-nya yang tersimpan, jadi password ini
-                tidak bisa ditampilkan lagi. Bila terlewat, pakai tombol Reset.
-            </span>
+<div class="card" style="max-width:640px">
+    <div class="card-h">
+        <div>
+            <h2>Tambah Akun</h2>
+            <p>PIN enam angka dibuat otomatis dan ditampilkan sekali</p>
         </div>
-    <?php endif; ?>
-
-    <div class="section">
-        <h2>Tambah Akun</h2>
+    </div>
+    <div class="card-b">
         <form method="POST" class="row">
             <input type="hidden" name="action" value="tambah">
             <div>
-                <label>Username</label>
-                <input type="text" name="username" placeholder="mis. budi" required
+                <label for="u-nama">Nama Pengguna</label>
+                <input id="u-nama" type="text" name="username" placeholder="budi" required
                        pattern="[a-z][a-z0-9_]{2,31}"
                        title="Huruf kecil, angka, garis bawah. 3-32 karakter.">
             </div>
             <div>
-                <label>Peran</label>
-                <select name="role">
+                <label for="u-peran">Peran</label>
+                <select id="u-peran" name="role">
                     <option value="user">Siswa</option>
-                    <option value="admin">Admin</option>
+                    <option value="admin">Administrator</option>
                 </select>
             </div>
-            <button type="submit" class="btn">+ Tambah</button>
+            <div class="row-fix">
+                <button type="submit" class="btn"><?php echo ikon('plus'); ?>Tambah</button>
+            </div>
         </form>
-        <p class="muted" style="margin-top:.8rem; font-size:.88rem">
-            Password dibuat acak dan ditampilkan sekali setelah akun dibuat.
-            Untuk mendaftarkan satu kelas sekaligus, pakai
-            <code>php tools/add-user.php --acak budi siti eka</code> di terminal.
-        </p>
+        <div class="hint" style="margin-top:.9rem">
+            Untuk mendaftarkan satu kelas sekaligus, jalankan
+            <code>php tools/add-user.php --acak budi siti eka</code> di terminal server.
+        </div>
     </div>
+</div>
 
-    <div class="section">
-        <h2>Daftar Akun (<?php echo count($users); ?>)</h2>
+<div class="card">
+    <div class="card-h">
+        <div>
+            <h2>Daftar Akun</h2>
+            <p><?php echo count($users); ?> akun terdaftar</p>
+        </div>
+    </div>
+    <div class="card-b flush">
         <table>
             <thead>
                 <tr>
-                    <th>Username</th><th>Peran</th><th>Project</th>
-                    <th>Database</th><th>Dibuat</th><th></th>
+                    <th>Pengguna</th><th>Peran</th>
+                    <th class="num">Project</th><th class="num">Database</th>
+                    <th class="num">Dibuat</th><th></th>
                 </tr>
             </thead>
             <tbody>
@@ -245,30 +199,36 @@ while ($row = $q->fetch_assoc()) {
                     <td>
                         <strong><?php echo htmlspecialchars($u['username']); ?></strong>
                         <?php if ((int) $u['id'] === (int) $me['id']): ?>
-                            <span class="muted">(Anda)</span>
+                            <span class="dim">&mdash; Anda</span>
                         <?php endif; ?>
                     </td>
                     <td>
-                        <span class="tag tag-<?php echo $u['role']; ?>">
-                            <?php echo $u['role'] === 'admin' ? 'ADMIN' : 'SISWA'; ?>
+                        <span class="pill <?php echo $u['role'] === 'admin' ? 'pill-warn' : 'pill-mute'; ?>">
+                            <?php echo $u['role'] === 'admin' ? 'Admin' : 'Siswa'; ?>
                         </span>
                     </td>
-                    <td><?php echo (int) $u['n_project']; ?></td>
-                    <td><?php echo (int) $u['n_db']; ?></td>
-                    <td class="muted"><?php echo date('d/m/y', strtotime($u['created_at'])); ?></td>
-                    <td style="text-align:right; white-space:nowrap">
-                        <form method="POST" class="inline"
-                              onsubmit="return confirm('Buatkan password baru untuk <?php echo htmlspecialchars($u['username'], ENT_QUOTES); ?>?\n\nPassword lamanya langsung tidak berlaku.');">
+                    <td class="num"><?php echo (int) $u['n_project']; ?></td>
+                    <td class="num"><?php echo (int) $u['n_db']; ?></td>
+                    <td class="num dim"><?php echo date('d M Y', strtotime($u['created_at'])); ?></td>
+                    <td class="num">
+                        <form method="POST" style="display:inline"
+                              onsubmit="return confirm('Buatkan PIN baru untuk <?php echo htmlspecialchars($u['username'], ENT_QUOTES); ?>?
+
+PIN lamanya langsung tidak berlaku.');">
                             <input type="hidden" name="action" value="reset">
                             <input type="hidden" name="user_id" value="<?php echo (int) $u['id']; ?>">
-                            <button type="submit" class="btn btn-kecil btn-abu">Reset</button>
+                            <button type="submit" class="btn btn-2 btn-sm">Reset PIN</button>
                         </form>
                         <?php if ((int) $u['id'] !== (int) $me['id']): ?>
-                            <form method="POST" class="inline"
-                                  onsubmit="return confirm('Hapus akun <?php echo htmlspecialchars($u['username'], ENT_QUOTES); ?>?\n\n<?php echo (int) $u['n_project']; ?> project dan <?php echo (int) $u['n_db']; ?> catatan database miliknya ikut terhapus.\n\nDatabase MySQL-nya TIDAK ikut terhapus -- buang lewat menu Databases lebih dulu bila perlu.');">
+                            <form method="POST" style="display:inline"
+                                  onsubmit="return confirm('Hapus akun <?php echo htmlspecialchars($u['username'], ENT_QUOTES); ?>?
+
+<?php echo (int) $u['n_project']; ?> project dan <?php echo (int) $u['n_db']; ?> catatan database miliknya ikut terhapus.
+
+Database MySQL-nya TIDAK ikut terhapus.');">
                                 <input type="hidden" name="action" value="hapus">
                                 <input type="hidden" name="user_id" value="<?php echo (int) $u['id']; ?>">
-                                <button type="submit" class="btn btn-kecil btn-merah">Hapus</button>
+                                <button type="submit" class="btn btn-danger btn-sm">Hapus</button>
                             </form>
                         <?php endif; ?>
                     </td>
@@ -278,5 +238,5 @@ while ($row = $q->fetch_assoc()) {
         </table>
     </div>
 </div>
-</body>
-</html>
+
+<?php layout_end(); ?>

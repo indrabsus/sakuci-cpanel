@@ -41,10 +41,12 @@ php -S 127.0.0.1:8000
 ```
 index.php                 halaman login
 app/
+  partials/layout.php     kerangka halaman: sidebar, bilah judul
+  assets/panel.css        sistem tampilan bersama
+app/
   dashboard.php           daftar project + tombol clone/pull
   add-project.php         tambah project dari GitHub
   databases.php           buat database per project
-  phpmyadmin.php          pintasan ke PhpMyAdmin
   api/clone.php           titipkan clone ke antrean (JSON)
   api/pull.php            titipkan pull ke antrean  (JSON)
   api/job-status.php      pantau status pekerjaan   (JSON)

@@ -45,7 +45,7 @@ async function deleteProject(btn) {
         });
 
         if (res.status === 401) {
-            ui.status('err', '❌ Sesi berakhir, mengalihkan ke login…');
+            ui.status('err', 'Sesi berakhir, mengalihkan ke login…');
             setTimeout(() => location.href = '../index.php', 1200);
             return;
         }
@@ -62,10 +62,10 @@ async function deleteProject(btn) {
             return;
         }
 
-        ui.status('err', '❌ ' + (data.error || 'Gagal menghapus'));
+        ui.status('err', data.error || 'Gagal menghapus');
         ui.busy(false);
     } catch (err) {
-        ui.status('err', '❌ Request gagal: ' + err.message);
+        ui.status('err', 'Request gagal: ' + err.message);
         ui.busy(false);
     }
 }
@@ -90,14 +90,14 @@ async function startGitAction(btn) {
 
         // Sudah ter-clone: tidak ada pekerjaan yang perlu dipantau.
         if (data.status === 'already_exists') {
-            ui.status('ok', '✅ ' + data.message);
+            ui.status('ok', data.message);
             markCloned(btn);
             ui.busy(false);
             return;
         }
 
         if (!data.job_id) {
-            ui.status('err', '❌ ' + (data.message || data.error || 'Gagal menitipkan pekerjaan'));
+            ui.status('err', data.message || data.error || 'Gagal menitipkan pekerjaan');
             ui.busy(false);
             return;
         }
@@ -105,7 +105,7 @@ async function startGitAction(btn) {
         ui.berjalan(data.message.replace(/…$/, ''));
         pollJob(data.job_id, btn, ui);
     } catch (err) {
-        ui.status('err', '❌ Request gagal: ' + err.message);
+        ui.status('err', 'Request gagal: ' + err.message);
         ui.busy(false);
     }
 }
@@ -120,7 +120,7 @@ async function pollJob(jobId, btn, ui) {
         try {
             data = await request(`api/job-status.php?job_id=${jobId}`, ui);
         } catch (err) {
-            ui.status('err', '❌ Gagal memantau: ' + err.message);
+            ui.status('err', 'Gagal memantau: ' + err.message);
             ui.busy(false);
             return;
         }
@@ -131,14 +131,14 @@ async function pollJob(jobId, btn, ui) {
         }
 
         if (data.status === 'success') {
-            ui.status('ok', '✅ ' + data.message);
+            ui.status('ok', data.message);
             if (data.action === 'clone') markCloned(btn);
             ui.busy(false);
             return;
         }
 
         if (data.status === 'failed') {
-            ui.status('err', '❌ ' + data.message);
+            ui.status('err', data.message);
             ui.busy(false);
             return;
         }
@@ -146,7 +146,7 @@ async function pollJob(jobId, btn, ui) {
         ui.berjalan(data.message.replace(/…$/, ''));
     }
 
-    ui.status('err', '❌ Terlalu lama menunggu. Periksa status worker di server.');
+    ui.status('err', 'Terlalu lama menunggu. Periksa status worker di server.');
     ui.busy(false);
 }
 
@@ -155,7 +155,7 @@ async function request(url, ui) {
     const res = await fetch(url, { credentials: 'same-origin' });
 
     if (res.status === 401) {
-        ui.status('err', '❌ Sesi berakhir, mengalihkan ke login…');
+        ui.status('err', 'Sesi berakhir, mengalihkan ke login…');
         setTimeout(() => location.href = '../index.php', 1200);
         return null;
     }
@@ -165,7 +165,7 @@ async function request(url, ui) {
 
 function markCloned(btn) {
     btn.dataset.action = 'pull';
-    btn.textContent = '⬇️ Pull';
+    btn.textContent = 'Pull';
 }
 
 function cardUi(card) {

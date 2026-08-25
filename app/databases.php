@@ -5,6 +5,7 @@ include '../config/mysql-admin.php';
 include '../config/env-writer.php';
 include '../config/files.php';
 include '../config/db-tools.php';
+include 'partials/layout.php';
 
 $user = require_login($conn);
 $user_id = $user['id'];
@@ -187,9 +188,9 @@ if (isset($_GET['pesan']) && str_contains((string) $_GET['pesan'], '|')) {
     [$jenis, $teks] = explode('|', (string) $_GET['pesan'], 2);
     $teks = htmlspecialchars($teks);
     if ($jenis === 'ok') {
-        $success = '✅ ' . $teks;
+        $success = $teks;
     } else {
-        $error = '❌ ' . $teks;
+        $error = $teks;
     }
 }
 
@@ -199,11 +200,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $project_id = intval($_POST['project_id'] ?? 0);
 
     if ($raw === '' || $project_id <= 0) {
-        $error = '❌ Nama database dan project harus diisi';
+        $error = 'Nama database dan project harus diisi';
     } elseif (!valid_mysql_identifier($db_name)) {
-        $error = '❌ Nama hanya boleh huruf kecil, angka, dan garis bawah (minimal 3 karakter)';
+        $error = 'Nama hanya boleh huruf kecil, angka, dan garis bawah (minimal 3 karakter)';
     } elseif ($admin === null) {
-        $error = '❌ Pembuatan database belum dikonfigurasi. Isi db_admin_user dan '
+        $error = 'Pembuatan database belum dikonfigurasi. Isi db_admin_user dan '
                . 'db_admin_pass di config/env.php.';
     } else {
         // Nama user MySQL dibatasi 32 karakter, jadi tidak bisa sekadar
@@ -214,7 +215,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $made = create_mysql_database($admin, $db_name, $db_user, $db_pass);
 
         if (!$made['ok']) {
-            $error = '❌ ' . $made['error'];
+            $error = $made['error'];
         } else {
             try {
                 // Kedua baris dicatat dalam satu transaksi. Tanpa ini, kegagalan
@@ -277,8 +278,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // db_users dipakai untuk mengingatkan siswa, bukan rahasia
                 // panel, tapi tetap tidak diulang di daftar.
                 $success = ($tulisEnv['ok']
-                        ? "✅ Database dibuat dan " . htmlspecialchars($tulisEnv['pesan']) . "<br>"
-                        : "✅ Database dibuat. ⚠️ " . htmlspecialchars($tulisEnv['pesan']) . "<br>")
+                        ? "Database dibuat dan " . htmlspecialchars($tulisEnv['pesan']) . "<br>"
+                        : "Database dibuat. " . htmlspecialchars($tulisEnv['pesan']) . "<br>")
                     . ""
                     . "Database: <code>" . htmlspecialchars($db_name) . "</code><br>"
                     . "User: <code>" . htmlspecialchars($db_user) . "</code><br>"
@@ -296,7 +297,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 drop_mysql_database($admin, $db_name, $db_user);
 
-                $error = '❌ Gagal menyimpan catatan database. Coba lagi.';
+                $error = 'Gagal menyimpan catatan database. Coba lagi.';
             }
         }
     }
@@ -327,142 +328,93 @@ if ($result) {
         $databases[] = $row;
     }
 }
+
+layout_start('Database', $isAdmin ? 'Seluruh database di panel ini' : 'Database milik Anda', 'db', $user);
 ?>
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Databases - Sakuci cPanel</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto; background: #f5f7fa; }
-        header { background: #667eea; color: white; padding: 1.5rem; }
-        header h1 { font-size: 1.5rem; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-        .nav { background: white; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; }
-        .nav a { margin-right: 1.5rem; text-decoration: none; color: #667eea; font-weight: 500; }
-        .nav a:hover { text-decoration: underline; }
-        .section { background: white; padding: 2rem; border-radius: 8px; margin-bottom: 2rem; }
-        .section h2 { margin-bottom: 1.5rem; color: #333; }
-        .form-group { margin-bottom: 1.5rem; }
-        label { display: block; margin-bottom: 0.5rem; color: #333; font-weight: 500; }
-        input, select { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem; font-family: inherit; }
-        input:focus, select:focus { outline: none; border-color: #667eea; }
-        .btn { display: inline-block; padding: 0.75rem 1.5rem; background: #667eea; color: white; text-decoration: none; border-radius: 5px; border: none; cursor: pointer; font-size: 1rem; font-weight: 500; }
-        .btn:hover { background: #5568d3; }
-        .btn-secondary { background: #718096; }
-        .akses { margin-top: .75rem; }
-        .akses summary { cursor: pointer; color: #667eea; font-weight: 500; font-size: .92rem; user-select: none; }
-        .akses summary:hover { text-decoration: underline; }
-        .akses[open] summary { margin-bottom: .75rem; }
-        /* Lipatannya diatur sendiri, tidak menumpang gaya bawaan browser:
-           kalau bawaan itu tidak diterapkan, password akan langsung terpampang
-           tanpa diklik. Sudah terjadi saat pengujian. */
-        .akses > *:not(summary) { display: none; }
-        .akses[open] > *:not(summary) { display: block; }
-        .akses-tabel { border-collapse: collapse; margin-bottom: .75rem; }
-        .akses-tabel th { text-align: left; padding: .25rem 1rem .25rem 0; font-weight: 500; color: #718096; font-size: .85rem; }
-        .akses-tabel td { padding: .25rem 0; }
-        .akses-judul { font-size: .85rem; color: #718096; margin-bottom: .35rem; }
-        .env-blok { background: #1a202c; color: #e2e8f0; padding: .85rem; border-radius: 5px; font-family: ui-monospace, Consolas, monospace; font-size: .82rem; line-height: 1.5; overflow-x: auto; white-space: pre; }
-        .btn-salin { margin-top: .5rem; padding: .35rem .9rem; font-size: .85rem; background: #4a5568; }
-        .btn-salin:hover { background: #2d3748; }
-        .alat-db { margin-top: .85rem; padding-top: .85rem; border-top: 1px solid #edf2f7; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
-        .alat-impor { display: flex; gap: .5rem; align-items: center; }
-        .alat-impor input[type=file] { font-size: .82rem; max-width: 15rem; padding: .3rem; border: 1px solid #e2e8f0; border-radius: 5px; background: white; }
-        .btn-kecil { padding: .4rem .9rem; font-size: .85rem; }
-        .btn-hati { background: #a0aec0; }
-        .btn-hati:hover { background: #c53030; }
-        .akses-kosong { margin-top: .5rem; font-size: .88rem; color: #a0aec0; }
-        .btn-danger { background: #a0aec0; padding: .5rem 1rem; font-size: .9rem; }
-        .btn-danger:hover { background: #c53030; }
-        .error { color: #e53e3e; background: #fed7d7; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; }
-        .success { color: #22863a; background: #f6f8fa; border: 1px solid #28a745; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; }
-        .db-item { background: #f7fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; }
-        .db-item h3 { color: #333; margin-bottom: 0.5rem; }
-        .db-meta { color: #666; font-size: 0.9rem; margin-bottom: 0.5rem; }
-        code { background: #edf2f7; padding: 0.2rem 0.5rem; border-radius: 3px; font-family: monospace; }
-    </style>
-</head>
-<body>
-    <header>
-        <h1>🚀 Sakuci cPanel</h1>
-        <p>Database Management</p>
-    </header>
 
-    <div class="container">
-        <div class="nav">
+<?php if ($error): ?><div class="note note-err"><?php echo $error; ?></div><?php endif; ?>
+<?php if ($success): ?><div class="note note-ok"><?php echo $success; ?></div><?php endif; ?>
+
+<div class="card" style="max-width:640px">
+    <div class="card-h">
+        <div>
+            <h2>Database Baru</h2>
+            <p>Kredensial dibuat otomatis dan langsung ditulis ke .env project</p>
+        </div>
+    </div>
+    <div class="card-b">
+        <?php if (!$projects): ?>
+            <p class="dim">Tambahkan project lebih dulu sebelum membuat database.</p>
+        <?php else: ?>
+        <form method="POST" class="row">
             <div>
-                <a href="dashboard.php">📊 Dashboard</a>
-                <a href="add-project.php">➕ Add Project</a>
-                <a href="databases.php">🗄️ Databases</a>
-                <a href="phpmyadmin.php">📊 PhpMyAdmin</a>
-                <?php if ($isAdmin): ?><a href="users.php">👥 Users</a><?php endif; ?>
+                <label for="d-proyek">Project</label>
+                <select id="d-proyek" name="project_id" required>
+                    <option value="">Pilih project</option>
+                    <?php foreach ($projects as $proj): ?>
+                        <option value="<?php echo $proj['id']; ?>"><?php echo htmlspecialchars($proj['name']); ?></option>
+                    <?php endforeach; ?>
+                </select>
             </div>
             <div>
-                <span>👤 <?php echo htmlspecialchars($username); ?></span>
-                <a href="../index.php?logout=1" class="btn btn-secondary" style="margin-left: 1rem; display: inline-block;">Logout</a>
+                <label for="d-nama">Nama Database</label>
+                <input id="d-nama" type="text" name="db_name" placeholder="toko" required>
             </div>
+            <div class="row-fix">
+                <button type="submit" class="btn"><?php echo ikon('plus'); ?>Buat</button>
+            </div>
+        </form>
+        <div class="hint" style="margin-top:.85rem">Awalan <code>db_</code> ditambahkan otomatis.</div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-h">
+        <div>
+            <h2>Daftar Database</h2>
+            <p><?php echo count($databases); ?> database terdaftar</p>
         </div>
+    </div>
 
-        <div class="section">
-            <h2>🗄️ Buat Database Baru</h2>
-
-            <?php if ($error): ?>
-                <div class="error"><?php echo $error; ?></div>
-            <?php endif; ?>
-
-            <?php if ($success): ?>
-                <div class="success"><?php echo $success; ?></div>
-            <?php endif; ?>
-
-            <form method="POST">
-                <div class="form-group">
-                    <label>Pilih Project</label>
-                    <select name="project_id" required>
-                        <option value="">-- Select Project --</option>
-                        <?php foreach ($projects as $proj): ?>
-                            <option value="<?php echo $proj['id']; ?>"><?php echo htmlspecialchars($proj['name']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>Nama Database</label>
-                    <input type="text" name="db_name" placeholder="Contoh: myapp_db" required>
-                    <small style="color: #666; display: block; margin-top: 0.5rem;">Prefix 'db_' akan ditambahkan otomatis</small>
-                </div>
-
-                <button type="submit" class="btn">🗄️ Buat Database</button>
-            </form>
-        </div>
-
-        <div class="section">
-            <h2>📋 Database Anda</h2>
-
-            <?php if (!empty($databases)): ?>
-                <?php foreach ($databases as $db): ?>
-                    <div class="db-item">
-                        <h3><?php echo htmlspecialchars($db['db_name']); ?></h3>
-                        <div class="db-meta">
-                            Project: <strong><?php echo htmlspecialchars($db['project_name'] ?? '-'); ?></strong><?php if ($isAdmin): ?> &middot; Pemilik: <strong><?php echo htmlspecialchars($db['owner']); ?></strong><?php endif; ?><br>
-                            Host: <code><?php echo htmlspecialchars($db['db_host']); ?></code>:<code><?php echo $db['db_port']; ?></code><br>
-                            Created: <?php echo date('d M Y H:i', strtotime($db['created_at'])); ?>
+    <?php if (!$databases): ?>
+        <div class="empty"><p>Belum ada database.</p></div>
+    <?php else: ?>
+    <div class="card-b" style="display:grid; gap:.85rem">
+        <?php foreach ($databases as $db): ?>
+            <div class="proyek">
+                <div class="proyek-h">
+                    <div>
+                        <div class="proyek-n">
+                            <?php echo htmlspecialchars($db['db_name']); ?>
+                            <?php if ($isAdmin): ?>
+                                <span class="pill pill-mute"><?php echo htmlspecialchars($db['owner']); ?></span>
+                            <?php endif; ?>
                         </div>
-                        <?php if ($db['db_user']): ?>
-                            <details class="akses">
-                                <summary>🔑 Lihat Akses</summary>
-                                <table class="akses-tabel">
-                                    <tr><th>Host</th><td><code><?php echo htmlspecialchars($db['db_host']); ?></code></td></tr>
-                                    <tr><th>Port</th><td><code><?php echo (int) $db['db_port']; ?></code></td></tr>
-                                    <tr><th>Database</th><td><code><?php echo htmlspecialchars($db['db_name']); ?></code></td></tr>
-                                    <tr><th>Username</th><td><code><?php echo htmlspecialchars($db['db_user']); ?></code></td></tr>
-                                    <tr><th>Password</th><td><code><?php echo htmlspecialchars($db['db_pass']); ?></code></td></tr>
-                                </table>
+                        <div class="proyek-m">
+                            Project <?php echo htmlspecialchars($db['project_name'] ?? '—'); ?>
+                            &middot; dibuat <?php echo date('d M Y', strtotime($db['created_at'])); ?>
+                        </div>
+                    </div>
+                    <?php if (PHPMYADMIN_URL !== ''): ?>
+                        <a class="git-btn" target="_blank" rel="noopener noreferrer"
+                           href="<?php echo htmlspecialchars(rtrim(PHPMYADMIN_URL, '/') . '/index.php?db=' . urlencode($db['db_name'])); ?>">phpMyAdmin</a>
+                    <?php endif; ?>
+                </div>
 
-                                <p class="akses-judul">Salin ke <code>.env</code> project Anda:</p>
-                                <pre class="env-blok" id="env-<?php echo (int) $db['id']; ?>">DB_CONNECTION=mysql
+                <?php if ($db['db_user']): ?>
+                    <details class="akses">
+                        <summary>Lihat kredensial</summary>
+                        <table class="akses-tabel">
+                            <tr><th>Host</th><td><code><?php echo htmlspecialchars($db['db_host']); ?></code></td></tr>
+                            <tr><th>Port</th><td><code><?php echo (int) $db['db_port']; ?></code></td></tr>
+                            <tr><th>Database</th><td><code><?php echo htmlspecialchars($db['db_name']); ?></code></td></tr>
+                            <tr><th>Pengguna</th><td><code><?php echo htmlspecialchars($db['db_user']); ?></code></td></tr>
+                            <tr><th>Sandi</th><td><code><?php echo htmlspecialchars($db['db_pass']); ?></code></td></tr>
+                        </table>
+
+                        <div class="hint">Salin ke berkas <code>.env</code> project:</div>
+                        <pre class="git-output show" id="env-<?php echo (int) $db['id']; ?>">DB_CONNECTION=mysql
 DB_HOST=<?php echo htmlspecialchars($db['db_host']); ?>
 
 DB_PORT=<?php echo (int) $db['db_port']; ?>
@@ -472,59 +424,52 @@ DB_DATABASE=<?php echo htmlspecialchars($db['db_name']); ?>
 DB_USERNAME=<?php echo htmlspecialchars($db['db_user']); ?>
 
 DB_PASSWORD=<?php echo htmlspecialchars($db['db_pass']); ?></pre>
-                                <button type="button" class="btn btn-salin"
-                                        data-target="env-<?php echo (int) $db['id']; ?>">📋 Salin</button>
-                                <?php if ($db['project_name']): ?>
-                                    <form method="POST" style="display:inline"
-                                          onsubmit="return confirm('Tulis kredensial ini ke berkas .env project?
-
-Pengaturan DB_ yang ada sekarang akan diganti.');">
-                                        <input type="hidden" name="action" value="tulis_env">
-                                        <input type="hidden" name="db_id" value="<?php echo (int) $db['id']; ?>">
-                                        <button type="submit" class="btn btn-salin">📝 Tulis ke .env</button>
-                                    </form>
-                                <?php endif; ?>
-                            </details>
-                        <?php else: ?>
-                            <p class="akses-kosong">Kredensial tidak tercatat untuk database ini.</p>
-                        <?php endif; ?>
-
-                        <div class="alat-db">
-                            <form method="POST" enctype="multipart/form-data" class="alat-impor"
-                                  onsubmit="return this.berkas.files.length > 0;">
-                                <input type="hidden" name="action" value="impor">
-                                <input type="hidden" name="db_id" value="<?php echo (int) $db['id']; ?>">
-                                <input type="file" name="berkas" accept=".sql" required>
-                                <button type="submit" class="btn btn-kecil">📥 Impor SQL</button>
-                            </form>
-
-                            <form method="POST" style="display:inline"
-                                  onsubmit="return confirm('Hapus SEMUA tabel di <?php echo htmlspecialchars($db['db_name'], ENT_QUOTES); ?>?
-
-Seluruh data di dalamnya hilang permanen. Databasenya sendiri tetap ada, hanya isinya yang dikosongkan.
-
-Tidak bisa dikembalikan.');">
-                                <input type="hidden" name="action" value="kosongkan">
-                                <input type="hidden" name="db_id" value="<?php echo (int) $db['id']; ?>">
-                                <button type="submit" class="btn btn-kecil btn-hati">🧹 Hapus Semua Tabel</button>
-                            </form>
+                        <div style="margin-top:.6rem; display:flex; gap:.45rem; flex-wrap:wrap">
+                            <button type="button" class="git-btn btn-salin"
+                                    data-target="env-<?php echo (int) $db['id']; ?>">Salin</button>
+                            <?php if ($db['project_name']): ?>
+                                <form method="POST" style="display:inline"
+                                      onsubmit="return confirm('Tulis kredensial ini ke berkas .env project? Pengaturan DB_ yang ada sekarang akan diganti.');">
+                                    <input type="hidden" name="action" value="tulis_env">
+                                    <input type="hidden" name="db_id" value="<?php echo (int) $db['id']; ?>">
+                                    <button type="submit" class="git-btn">Tulis ke .env</button>
+                                </form>
+                            <?php endif; ?>
                         </div>
+                    </details>
+                <?php endif; ?>
 
-                        <form method="POST" style="margin-top:.75rem"
-                              onsubmit="return confirm('Hapus database <?php echo htmlspecialchars($db['db_name'], ENT_QUOTES); ?>?
+                <div class="git-actions" style="margin-top:.85rem; padding-top:.85rem; border-top:1px solid var(--line-soft)">
+                    <form method="POST" enctype="multipart/form-data" class="alat-impor"
+                          onsubmit="return this.berkas.files.length > 0;">
+                        <input type="hidden" name="action" value="impor">
+                        <input type="hidden" name="db_id" value="<?php echo (int) $db['id']; ?>">
+                        <input type="file" name="berkas" accept=".sql" required>
+                        <button type="submit" class="git-btn">Impor SQL</button>
+                    </form>
 
-SELURUH TABEL DAN DATANYA HILANG PERMANEN dan tidak bisa dikembalikan.');">
-                            <input type="hidden" name="action" value="hapus">
-                            <input type="hidden" name="db_id" value="<?php echo (int) $db['id']; ?>">
-                            <button type="submit" class="btn btn-danger">🗑 Hapus Database</button>
-                        </form>
-                    </div>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <p style="color: #666; text-align: center; padding: 2rem;">Anda belum membuat database apapun.</p>
-            <?php endif; ?>
-        </div>
+                    <span class="git-spacer"></span>
+
+                    <form method="POST" style="display:inline"
+                          onsubmit="return confirm('Hapus SEMUA tabel di <?php echo htmlspecialchars($db['db_name'], ENT_QUOTES); ?>? Seluruh data di dalamnya hilang permanen. Databasenya sendiri tetap ada. Tidak bisa dikembalikan.');">
+                        <input type="hidden" name="action" value="kosongkan">
+                        <input type="hidden" name="db_id" value="<?php echo (int) $db['id']; ?>">
+                        <button type="submit" class="git-btn git-btn-danger">Kosongkan Tabel</button>
+                    </form>
+
+                    <form method="POST" style="display:inline"
+                          onsubmit="return confirm('Hapus database <?php echo htmlspecialchars($db['db_name'], ENT_QUOTES); ?>? SELURUH TABEL DAN DATANYA hilang permanen. Tidak bisa dikembalikan.');">
+                        <input type="hidden" name="action" value="hapus">
+                        <input type="hidden" name="db_id" value="<?php echo (int) $db['id']; ?>">
+                        <button type="submit" class="git-btn git-btn-danger">Hapus Database</button>
+                    </form>
+                </div>
+            </div>
+        <?php endforeach; ?>
     </div>
+    <?php endif; ?>
+</div>
+
 <script>
 // Menyalin blok .env ke papan klip. navigator.clipboard hanya tersedia pada
 // HTTPS atau localhost, jadi disediakan cara cadangan agar tetap berfungsi
@@ -536,7 +481,7 @@ document.addEventListener('click', function (e) {
     const teks = document.getElementById(btn.dataset.target).textContent;
     const selesai = () => {
         const semula = btn.textContent;
-        btn.textContent = '✅ Tersalin';
+        btn.textContent = 'Tersalin';
         setTimeout(() => btn.textContent = semula, 1500);
     };
 
@@ -554,9 +499,9 @@ function salinCadangan(teks, selesai) {
     ta.style.opacity = '0';
     document.body.appendChild(ta);
     ta.select();
-    try { document.execCommand('copy'); selesai(); } catch (err) { /* biarkan pengguna menyalin manual */ }
+    try { document.execCommand('copy'); selesai(); } catch (err) { /* biarkan disalin manual */ }
     document.body.removeChild(ta);
 }
 </script>
-</body>
-</html>
+
+<?php layout_end(); ?>

@@ -1,10 +1,11 @@
 <?php
 include '../config/config.php';
 include '../config/auth.php';
+include 'partials/layout.php';
 
 $user = require_login($conn);
 $user_id = $user['id'];
-$username = $user['username'];
+$admin = is_admin($user);
 
 // Pesan dari halaman lain, mis. setelah menambah project.
 $pesanOk = '';
@@ -19,7 +20,6 @@ if (isset($_GET['pesan']) && str_contains((string) $_GET['pesan'], '|')) {
 }
 
 // Admin melihat milik semua orang; siswa hanya miliknya sendiri.
-$admin = is_admin($user);
 $projects = [];
 $sql = "SELECT p.*, u.username AS owner FROM projects p
         JOIN users u ON u.id = p.user_id"
@@ -32,131 +32,126 @@ if ($result) {
     }
 }
 
-// Get databases count
 $db_count = 0;
 $result = $conn->query("SELECT COUNT(*) as total FROM db_list" . ($admin ? "" : " WHERE user_id = $user_id"));
 if ($result) {
     $db_count = $result->fetch_assoc()['total'];
 }
+
+$terclone = 0;
+foreach ($projects as $p) {
+    if (is_dir($p['local_path'])) {
+        $terclone++;
+    }
+}
+
+layout_start(
+    'Dashboard',
+    $admin ? 'Seluruh project di panel ini' : 'Project milik Anda',
+    'dashboard',
+    $user,
+    ['teks' => 'Tambah Project', 'href' => 'add-project.php']
+);
 ?>
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Sakuci cPanel</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto; background: #f5f7fa; }
-        header { background: #667eea; color: white; padding: 1.5rem; }
-        header h1 { font-size: 1.5rem; }
-        header p { font-size: 0.9rem; opacity: 0.9; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-        .nav { background: white; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; }
-        .nav a { margin-right: 1.5rem; text-decoration: none; color: #667eea; font-weight: 500; }
-        .nav a:hover { text-decoration: underline; }
-        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-        .stat { background: white; padding: 1.5rem; border-radius: 8px; text-align: center; }
-        .stat-number { font-size: 2.5rem; font-weight: 700; color: #667eea; }
-        .stat-label { color: #666; margin-top: 0.5rem; }
-        .section { background: white; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; }
-        .section h2 { margin-bottom: 1rem; color: #333; }
-        .btn { display: inline-block; padding: 0.75rem 1.5rem; background: #667eea; color: white; text-decoration: none; border-radius: 5px; border: none; cursor: pointer; font-size: 1rem; }
-        .btn:hover { background: #5568d3; }
-        .project-card { background: #f7fafc; border: 1px solid #e2e8f0; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; }
-        .project-name { font-weight: 600; color: #333; font-size: 1.1rem; }
-        .project-info { color: #666; font-size: 0.9rem; margin-top: 0.5rem; }
-        .logout { color: #e53e3e; }
-        .pesan { padding: .85rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: .95rem; }
-        .pesan-ok { background: #f0fff4; color: #22543d; border: 1px solid #9ae6b4; }
-        .pesan-err { background: #fff5f5; color: #822727; border: 1px solid #feb2b2; }
-        .owner-tag { font-size: .78rem; font-weight: 500; background: #edf2f7; color: #4a5568; padding: .15rem .5rem; border-radius: 999px; margin-left: .5rem; vertical-align: middle; }
-    </style>
-    <?php // ?v=<waktu ubah> memaksa browser mengambil ulang begitu berkas berubah;
-          // tanpa ini cache 30 hari di .htaccess menyajikan versi lama. ?>
-    <link rel="stylesheet" href="assets/git-actions.css?v=<?php echo filemtime(__DIR__ . '/assets/git-actions.css'); ?>">
-</head>
-<body>
-    <header>
-        <h1>🚀 Sakuci cPanel</h1>
-        <p>Welcome, <?php echo htmlspecialchars($username); ?></p>
-    </header>
 
-    <div class="container">
-        <div class="nav">
-            <div>
-                <a href="#projects">Projects</a>
-                <a href="databases.php">Databases</a>
-                <a href="phpmyadmin.php">PhpMyAdmin</a>
-                <?php if ($admin): ?><a href="users.php">👥 Users</a><?php endif; ?>
-            </div>
-            <a href="../index.php?logout=1" class="logout">Logout</a>
-        </div>
+<?php if ($pesanOk): ?><div class="note note-ok"><?php echo $pesanOk; ?></div><?php endif; ?>
+<?php if ($pesanErr): ?><div class="note note-err"><?php echo $pesanErr; ?></div><?php endif; ?>
 
-        <?php if ($pesanOk): ?><div class="pesan pesan-ok">✅ <?php echo $pesanOk; ?></div><?php endif; ?>
-        <?php if ($pesanErr): ?><div class="pesan pesan-err">❌ <?php echo $pesanErr; ?></div><?php endif; ?>
+<div class="stats">
+    <div class="stat">
+        <div class="stat-n"><?php echo count($projects); ?></div>
+        <div class="stat-l">Project</div>
+    </div>
+    <div class="stat">
+        <div class="stat-n"><?php echo $terclone; ?></div>
+        <div class="stat-l">Sudah di-clone</div>
+    </div>
+    <div class="stat">
+        <div class="stat-n"><?php echo $db_count; ?></div>
+        <div class="stat-l">Database</div>
+    </div>
+</div>
 
-        <div class="stats">
-            <div class="stat">
-                <div class="stat-number"><?php echo count($projects); ?></div>
-                <div class="stat-label">Projects</div>
-            </div>
-            <div class="stat">
-                <div class="stat-number"><?php echo $db_count; ?></div>
-                <div class="stat-label">Databases</div>
-            </div>
-        </div>
-
-        <div class="section">
-            <h2 id="projects">📁 Projects</h2>
-            <a href="add-project.php" class="btn">+ Add Project from GitHub</a>
-
-            <?php if (count($projects) > 0): ?>
-                <div style="margin-top: 1.5rem;">
-                    <?php foreach ($projects as $project): ?>
-                    <?php $cloned = is_dir($project['local_path']); ?>
-                    <div class="project-card" data-project="<?php echo $project['id']; ?>">
-                        <div class="project-name">📂 <?php echo htmlspecialchars($project['name']); ?>
-                            <?php if ($admin): ?>
-                                <span class="owner-tag">👤 <?php echo htmlspecialchars($project['owner']); ?></span>
-                            <?php endif; ?>
-                        </div>
-                        <div class="project-info">
-                            🌐 <?php echo htmlspecialchars($project['domain'] ?? 'No domain'); ?><br>
-                            📦 <?php echo htmlspecialchars($project['git_url']); ?><br>
-                            🔀 Branch: <?php echo htmlspecialchars($project['git_branch']); ?><br>
-                            📅 <?php echo date('d M Y', strtotime($project['created_at'])); ?>
-                        </div>
-                        <div class="git-actions">
-                            <?php if ($cloned): ?>
-                                <button class="git-btn" data-action="pull">⬇️ Pull</button>
-                                <span class="git-status">
-                                    <?php echo $project['last_pull']
-                                        ? 'Last pull: ' . date('d M Y H:i', strtotime($project['last_pull']))
-                                        : 'Belum pernah di-pull'; ?>
-                                </span>
-                            <?php else: ?>
-                                <button class="git-btn" data-action="clone">📥 Clone</button>
-                                <span class="git-status">Belum di-clone ke server</span>
-                            <?php endif; ?>
-                            <?php if ($cloned && SITE_DOMAIN !== ''): ?>
-                                <?php $url = 'http://' . basename($project['local_path']) . '.' . SITE_DOMAIN; ?>
-                                <a class="git-btn git-btn-open" target="_blank" rel="noopener noreferrer"
-                                   href="<?php echo htmlspecialchars($url); ?>">🌐 Buka Web</a>
-                            <?php endif; ?>
-                            <a class="git-btn git-btn-file" href="files.php?project=<?php echo $project['id']; ?>">📁 File</a>
-                            <button class="git-btn git-btn-danger" data-action="delete"
-                                    data-name="<?php echo htmlspecialchars($project['name'], ENT_QUOTES); ?>">🗑 Hapus</button>
-                        </div>
-                        <pre class="git-output"></pre>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-            <?php else: ?>
-                <p style="color: #666; margin-top: 1rem;">No projects yet. <a href="add-project.php" style="color: #667eea;">Add one from GitHub</a></p>
-            <?php endif; ?>
+<div class="card">
+    <div class="card-h">
+        <div>
+            <h2>Project</h2>
+            <p><?php echo $admin ? 'Termasuk milik seluruh pengguna' : 'Repo yang Anda daftarkan'; ?></p>
         </div>
     </div>
-    <script src="assets/git-actions.js?v=<?php echo filemtime(__DIR__ . "/assets/git-actions.js"); ?>"></script>
-</body>
-</html>
+
+    <?php if (!$projects): ?>
+        <div class="empty">
+            <p>Belum ada project. Tambahkan repo Sakuci Framework untuk memulai.</p>
+            <a class="btn" href="add-project.php"><?php echo ikon('plus'); ?>Tambah Project</a>
+        </div>
+    <?php else: ?>
+        <div class="card-b" style="display:grid; gap:.85rem">
+            <?php foreach ($projects as $project): ?>
+                <?php
+                $cloned = is_dir($project['local_path']);
+                $url = SITE_DOMAIN !== ''
+                    ? 'http://' . basename($project['local_path']) . '.' . SITE_DOMAIN
+                    : '';
+                ?>
+                <div class="proyek" data-project="<?php echo $project['id']; ?>">
+                    <div class="proyek-h">
+                        <div>
+                            <div class="proyek-n">
+                                <?php echo htmlspecialchars($project['name']); ?>
+                                <?php if ($admin): ?>
+                                    <span class="pill pill-mute"><?php echo htmlspecialchars($project['owner']); ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="proyek-m mono"><?php echo htmlspecialchars($project['git_url']); ?></div>
+                        </div>
+                        <span class="pill <?php echo $cloned ? 'pill-accent' : 'pill-warn'; ?>">
+                            <?php echo $cloned ? 'Aktif' : 'Belum di-clone'; ?>
+                        </span>
+                    </div>
+
+                    <dl class="proyek-d">
+                        <div><dt>Alamat</dt><dd>
+                            <?php if ($cloned && $url !== ''): ?>
+                                <a href="<?php echo htmlspecialchars($url); ?>" target="_blank" rel="noopener noreferrer">
+                                    <?php echo htmlspecialchars(basename($project['local_path']) . '.' . SITE_DOMAIN); ?>
+                                </a>
+                            <?php else: ?>
+                                <span class="dim"><?php echo htmlspecialchars($project['domain'] ?? '—'); ?></span>
+                            <?php endif; ?>
+                        </dd></div>
+                        <div><dt>Branch</dt><dd class="mono"><?php echo htmlspecialchars($project['git_branch']); ?></dd></div>
+                        <div><dt>Dibuat</dt><dd><?php echo date('d M Y', strtotime($project['created_at'])); ?></dd></div>
+                    </dl>
+
+                    <div class="git-actions">
+                        <?php if ($cloned): ?>
+                            <button class="git-btn" data-action="pull">Pull</button>
+                            <span class="git-status">
+                                <?php echo $project['last_pull']
+                                    ? 'Terakhir ditarik ' . date('d M, H:i', strtotime($project['last_pull']))
+                                    : 'Belum pernah ditarik'; ?>
+                            </span>
+                        <?php else: ?>
+                            <button class="git-btn" data-action="clone">Clone</button>
+                            <span class="git-status">Belum diambil ke server</span>
+                        <?php endif; ?>
+
+                        <span class="git-spacer"></span>
+
+                        <?php if ($cloned && $url !== ''): ?>
+                            <a class="git-btn git-btn-open" target="_blank" rel="noopener noreferrer"
+                               href="<?php echo htmlspecialchars($url); ?>">Buka Web</a>
+                        <?php endif; ?>
+                        <a class="git-btn git-btn-file" href="files.php?project=<?php echo $project['id']; ?>">Berkas</a>
+                        <button class="git-btn git-btn-danger" data-action="delete"
+                                data-name="<?php echo htmlspecialchars($project['name'], ENT_QUOTES); ?>">Hapus</button>
+                    </div>
+                    <pre class="git-output"></pre>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</div>
+
+<?php layout_end(true); ?>
