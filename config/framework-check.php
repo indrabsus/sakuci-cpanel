@@ -48,10 +48,25 @@ function periksa_sakuci(string $path): array
     return ['ok' => $kurang === [], 'kurang' => $kurang];
 }
 
-/** Pesan yang ditampilkan ke siswa saat repo ditolak. */
-function pesan_bukan_sakuci(array $kurang): string
+/**
+ * Pesan yang ditampilkan ke siswa saat repo ditolak.
+ *
+ * Sengaja TIDAK merinci apa yang kurang. Daftar itu sama saja dengan memberi
+ * petunjuk berkas apa yang perlu dipalsukan agar lolos. Rinciannya tetap
+ * dicatat ke log server lewat catat_penolakan() supaya pengelola bisa
+ * membantu siswa yang gagal karena alasan jujur, misalnya salah tempel URL.
+ */
+function pesan_bukan_sakuci(): string
 {
     return "Repo ini bukan project Sakuci Framework, jadi tidak bisa di-hosting di sini.\n\n"
-        . "Yang tidak ditemukan:\n  - " . implode("\n  - ", $kurang) . "\n\n"
         . "Pastikan URL repo benar dan project dibuat dari Sakuci Framework.";
+}
+
+/** Mencatat alasan sebenarnya ke log server, bukan ke layar siswa. */
+function catat_penolakan(string $gitUrl, array $kurang): void
+{
+    error_log(
+        'Clone ditolak, bukan project Sakuci: ' . $gitUrl
+        . ' -- tidak ditemukan: ' . implode('; ', $kurang)
+    );
 }

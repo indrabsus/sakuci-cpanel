@@ -177,7 +177,8 @@ while ($processed < MAX_PER_RUN) {
 
             if (!$cek['ok']) {
                 delete_recursive_worker($sementara);
-                finish($conn, $id, 'failed', pesan_bukan_sakuci($cek['kurang']));
+                catat_penolakan($job['git_url'], $cek['kurang']);
+                finish($conn, $id, 'failed', pesan_bukan_sakuci());
                 continue;
             }
         }
