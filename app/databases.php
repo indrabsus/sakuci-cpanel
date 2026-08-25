@@ -2,6 +2,8 @@
 include '../config/config.php';
 include '../config/auth.php';
 include '../config/mysql-admin.php';
+include '../config/env-writer.php';
+include '../config/files.php';
 
 $user = require_login($conn);
 $user_id = $user['id'];
@@ -49,6 +51,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'hapus
 
             $pesan = 'ok|Database ' . $row['db_name'] . ' dihapus beserta seluruh isinya.';
         }
+    }
+
+    header('Location: databases.php?pesan=' . urlencode($pesan));
+    exit;
+}
+
+// Menuliskan ulang kredensial ke .env. Berguna bila database dibuat sebelum
+// project di-clone, sehingga penulisan otomatis saat itu terlewat.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'tulis_env') {
+    $db_id = intval($_POST['db_id'] ?? 0);
+
+    $sqlT = "SELECT d.db_name, d.db_host, d.db_port, du.username, du.password, p.local_path
+               FROM db_list d
+               LEFT JOIN db_users du ON du.db_id = d.id
+               LEFT JOIN projects p ON p.id = d.project_id
+              WHERE d.id = ?" . ($isAdmin ? "" : " AND d.user_id = ?");
+    $q = $conn->prepare($sqlT);
+    if ($isAdmin) {
+        $q->bind_param("i", $db_id);
+    } else {
+        $q->bind_param("ii", $db_id, $user_id);
+    }
+    $q->execute();
+    $d = $q->get_result()->fetch_assoc();
+
+    if (!$d || !$d['username']) {
+        $pesan = 'err|Kredensial database tidak ditemukan.';
+    } elseif (!$d['local_path']) {
+        $pesan = 'err|Database ini tidak terhubung ke project mana pun.';
+    } else {
+        $hasil = write_db_env($d['local_path'], [
+            'host' => $d['db_host'],
+            'port' => (string) $d['db_port'],
+            'nama' => $d['db_name'],
+            'user' => $d['username'],
+            'pass' => $d['password'],
+        ]);
+        $pesan = ($hasil['ok'] ? 'ok|' : 'err|') . $hasil['pesan'];
     }
 
     header('Location: databases.php?pesan=' . urlencode($pesan));
@@ -116,10 +156,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $conn->commit();
 
+                // Langsung tuliskan ke .env project yang dipilih supaya siswa
+                // tidak perlu menyalin manual -- langkah yang paling sering
+                // salah ketik. Kegagalannya tidak membatalkan pembuatan
+                // database; kredensialnya tetap ditampilkan untuk disalin.
+                // Diambil langsung dari database, bukan dari daftar $projects --
+                // daftar itu baru diisi setelah blok ini. Kepemilikan tetap
+                // disaring agar tidak bisa menulis ke .env project orang lain.
+                $tulisEnv = ['ok' => false, 'pesan' => 'Project tidak ditemukan.'];
+
+                $sqlPr = "SELECT local_path FROM projects WHERE id = ?"
+                       . ($isAdmin ? "" : " AND user_id = ?");
+                $qPr = $conn->prepare($sqlPr);
+                if ($isAdmin) {
+                    $qPr->bind_param("i", $project_id);
+                } else {
+                    $qPr->bind_param("ii", $project_id, $user_id);
+                }
+                $qPr->execute();
+
+                if ($pr = $qPr->get_result()->fetch_assoc()) {
+                    $tulisEnv = write_db_env($pr['local_path'], [
+                        'host' => 'localhost',
+                        'port' => '3306',
+                        'nama' => $db_name,
+                        'user' => $db_user,
+                        'pass' => $db_pass,
+                    ]);
+                }
+
                 // Password ditampilkan sekali ini saja: yang tersimpan di
                 // db_users dipakai untuk mengingatkan siswa, bukan rahasia
                 // panel, tapi tetap tidak diulang di daftar.
-                $success = "✅ Database dibuat.<br>"
+                $success = ($tulisEnv['ok']
+                        ? "✅ Database dibuat dan " . htmlspecialchars($tulisEnv['pesan']) . "<br>"
+                        : "✅ Database dibuat. ⚠️ " . htmlspecialchars($tulisEnv['pesan']) . "<br>")
+                    . ""
                     . "Database: <code>" . htmlspecialchars($db_name) . "</code><br>"
                     . "User: <code>" . htmlspecialchars($db_user) . "</code><br>"
                     . "Password: <code>" . htmlspecialchars($db_pass) . "</code><br>"
@@ -308,6 +380,16 @@ DB_USERNAME=<?php echo htmlspecialchars($db['db_user']); ?>
 DB_PASSWORD=<?php echo htmlspecialchars($db['db_pass']); ?></pre>
                                 <button type="button" class="btn btn-salin"
                                         data-target="env-<?php echo (int) $db['id']; ?>">📋 Salin</button>
+                                <?php if ($db['project_name']): ?>
+                                    <form method="POST" style="display:inline"
+                                          onsubmit="return confirm('Tulis kredensial ini ke berkas .env project?
+
+Pengaturan DB_ yang ada sekarang akan diganti.');">
+                                        <input type="hidden" name="action" value="tulis_env">
+                                        <input type="hidden" name="db_id" value="<?php echo (int) $db['id']; ?>">
+                                        <button type="submit" class="btn btn-salin">📝 Tulis ke .env</button>
+                                    </form>
+                                <?php endif; ?>
                             </details>
                         <?php else: ?>
                             <p class="akses-kosong">Kredensial tidak tercatat untuk database ini.</p>
