@@ -105,5 +105,9 @@ $v = fn(string $f) => $f . '?v=' . @filemtime(__DIR__ . '/app/assets/' . $f);
     </div>
 </div>
 
+<footer class="masuk-kaki">
+    Sakuci cPanel &mdash; Created by Indra Batara, S.Pd., Gr.
+</footer>
+
 </body>
 </html>

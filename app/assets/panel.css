@@ -250,6 +250,16 @@ td a:hover { color: var(--accent); }
 .empty p { color: var(--ink-2); font-size: .88rem; }
 .empty .btn { margin-top: .9rem; }
 
+/* ---------- Kaki halaman ---------- */
+
+.kaki {
+    padding: 1.15rem 2rem 1.6rem;
+    border-top: 1px solid var(--line);
+    color: var(--ink-3);
+    font-size: .78rem;
+    letter-spacing: .01em;
+}
+
 /* ---------- Layar sempit ---------- */
 
 @media (max-width: 820px) {
@@ -257,5 +267,5 @@ td a:hover { color: var(--accent); }
     .side { width: 100%; height: auto; position: static; }
     .side-nav { display: flex; gap: .2rem; overflow-x: auto; padding: .5rem; }
     .side-nav a { white-space: nowrap; margin-bottom: 0; }
-    .wrap, .topbar { padding-left: 1.1rem; padding-right: 1.1rem; }
+    .wrap, .topbar, .kaki { padding-left: 1.1rem; padding-right: 1.1rem; }
 }

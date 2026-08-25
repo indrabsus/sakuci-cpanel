@@ -2,6 +2,9 @@
 
 body.masuk {
     display: flex;
+    /* Kolom, bukan baris: tanpa ini kaki halaman berdiri di samping kotak
+       masuk, bukan di bawahnya. */
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     min-height: 100vh;
@@ -40,10 +43,12 @@ body.masuk::before {
 .masuk-isi .btn { width: 100%; justify-content: center; margin-top: .35rem; padding: .62rem; }
 
 .masuk-kaki {
+    position: relative;
     text-align: center;
     font-size: .76rem;
-    color: var(--ink-3);
-    padding-bottom: 1.6rem;
+    color: rgba(255,255,255,.45);
+    margin-top: 1.4rem;
+    letter-spacing: .01em;
 }
 
 /* PIN enam angka: diberi jarak antarhuruf agar mudah dibaca saat diketik. */

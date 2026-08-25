@@ -98,6 +98,10 @@ function layout_end(bool $pakaiSkrip = false): void
 {
     ?>
         </div>
+
+        <footer class="kaki">
+            Sakuci cPanel &mdash; Created by Indra Batara, S.Pd., Gr.
+        </footer>
     </div>
 </div>
 <?php if ($pakaiSkrip): ?>
