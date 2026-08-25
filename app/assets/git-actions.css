@@ -9,8 +9,31 @@
 .git-btn-file { background: #4a5568; text-decoration: none; }
 .git-btn-file:hover { background: #2d3748; }
 a.git-btn { line-height: normal; }
-.git-status { font-size: 0.9rem; color: #666; }
+.git-status { font-size: 0.9rem; color: #666; display: inline-flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
 .git-status.running { color: #92400e; }
+
+/* Cincin berputar sebagai tanda proses masih hidup. Animasi CSS dipilih agar
+   tetap berjalan mulus tanpa bergantung pada siklus pemantauan. */
+.spinner {
+    width: .85rem; height: .85rem; flex: none;
+    border: 2px solid rgba(146, 64, 14, .25);
+    border-top-color: #92400e;
+    border-radius: 50%;
+    animation: putar .7s linear infinite;
+}
+@keyframes putar { to { transform: rotate(360deg); } }
+
+/* Bagi yang mematikan animasi karena alasan kenyamanan, cincin tetap terlihat
+   sebagai penanda meski tidak berputar. */
+@media (prefers-reduced-motion: reduce) {
+    .spinner { animation-duration: 3s; }
+}
+
+.git-catatan { display: block; width: 100%; color: #a0aec0; font-size: .78rem; }
+
+/* Kartu diredupkan selama proses agar jelas bagian mana yang sedang bekerja. */
+.project-card.sedang-proses,
+.project-item.sedang-proses { background: #fffdf7; border-color: #fbd38d; }
 .git-status.ok { color: #166534; }
 .git-status.err { color: #991b1b; }
 .git-output { display: none; margin-top: 0.75rem; padding: 0.75rem; background: #1a202c; color: #e2e8f0; border-radius: 4px; font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem; white-space: pre-wrap; overflow: auto; max-height: 200px; }

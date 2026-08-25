@@ -34,7 +34,7 @@ async function deleteProject(btn) {
 
     const ui = cardUi(card);
     ui.busy(true);
-    ui.status('running', '⏳ Menghapus…');
+    ui.berjalan('Menghapus');
 
     try {
         const res = await fetch('api/delete-project.php', {
@@ -76,7 +76,7 @@ async function startGitAction(btn) {
 
     const ui = cardUi(card);
     ui.busy(true);
-    ui.status('running', action === 'clone' ? '⏳ Menitipkan clone…' : '⏳ Menitipkan pull…');
+    ui.berjalan(action === 'clone' ? 'Menitipkan clone' : 'Menitipkan pull');
     ui.output('');
 
     try {
@@ -97,7 +97,7 @@ async function startGitAction(btn) {
             return;
         }
 
-        ui.status('running', '⏳ ' + data.message);
+        ui.berjalan(data.message.replace(/…$/, ''));
         pollJob(data.job_id, btn, ui);
     } catch (err) {
         ui.status('err', '❌ Request gagal: ' + err.message);
@@ -138,7 +138,7 @@ async function pollJob(jobId, btn, ui) {
             return;
         }
 
-        ui.status('running', '⏳ ' + data.message);
+        ui.berjalan(data.message.replace(/…$/, ''));
     }
 
     ui.status('err', '❌ Terlalu lama menunggu. Periksa status worker di server.');
@@ -168,8 +168,54 @@ function cardUi(card) {
     const outputEl = card.querySelector('.git-output');
     const buttons = card.querySelectorAll('.git-btn');
 
+    // Penghitung detik berdetak sendiri tiap satu detik, terpisah dari siklus
+    // pemantauan yang dua detik sekali. Tanpa itu tampilan terasa membeku,
+    // terutama saat menunggu giliran worker yang bisa mencapai satu menit.
+    let ticker = null;
+    let mulai = 0;
+    let teksDasar = '';
+
+    const gambarBerjalan = () => {
+        const detik = Math.floor((Date.now() - mulai) / 1000);
+
+        statusEl.className = 'git-status running';
+        statusEl.textContent = '';
+
+        const putar = document.createElement('span');
+        putar.className = 'spinner';
+        statusEl.appendChild(putar);
+        statusEl.appendChild(document.createTextNode(teksDasar + ' (' + detik + ' detik)'));
+
+        // Antrean dikerjakan cron tiap menit, jadi menunggu sampai 60 detik itu
+        // wajar. Tanpa keterangan ini orang mengira panelnya menggantung.
+        if (detik >= 8 && /menunggu/i.test(teksDasar)) {
+            const catatan = document.createElement('small');
+            catatan.className = 'git-catatan';
+            catatan.textContent = 'Worker berjalan tiap menit, mohon tunggu.';
+            statusEl.appendChild(catatan);
+        }
+    };
+
+    const hentikanTicker = () => {
+        if (ticker) {
+            clearInterval(ticker);
+            ticker = null;
+        }
+    };
+
     return {
+        /** Keadaan sedang berjalan: berputar, dengan detik yang terus bertambah. */
+        berjalan: (text) => {
+            teksDasar = text;
+            if (!ticker) {
+                mulai = Date.now();
+                ticker = setInterval(gambarBerjalan, 1000);
+            }
+            gambarBerjalan();
+        },
+        /** Keadaan selesai: ticker dimatikan, teks statis. */
         status: (kind, text) => {
+            hentikanTicker();
             statusEl.className = 'git-status ' + kind;
             statusEl.textContent = text;
         },
@@ -177,7 +223,11 @@ function cardUi(card) {
             outputEl.textContent = text;
             outputEl.classList.toggle('show', Boolean(text));
         },
-        busy: (on) => buttons.forEach(b => b.disabled = on),
+        busy: (on) => {
+            if (!on) hentikanTicker();
+            buttons.forEach(b => b.disabled = on);
+            card.classList.toggle('sedang-proses', on);
+        },
     };
 }
 
