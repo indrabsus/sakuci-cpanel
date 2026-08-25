@@ -52,11 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Pesan sengaja sama untuk username salah maupun password salah:
         // membedakannya memberi tahu penebak akun mana yang benar-benar ada.
-        $tersisa = LOGIN_MAKS_GAGAL - (int) $conn->query(
-            "SELECT COUNT(*) AS n FROM login_gagal
-              WHERE ip = '" . $conn->real_escape_string($ip) . "'
-                AND waktu > (NOW() - INTERVAL " . LOGIN_JENDELA . " SECOND)"
-        )->fetch_assoc()['n'];
+        $tersisa = LOGIN_MAKS_GAGAL - jumlah_gagal($conn, $ip);
 
         $error = 'Username atau password salah.'
                . ($tersisa > 0 && $tersisa <= 2 ? ' Sisa ' . $tersisa . ' percobaan.' : '');

@@ -24,6 +24,13 @@ function ip_pemanggil(): string
  */
 function sisa_blokir($conn, string $ip): int
 {
+    // Pembatasan ini pelengkap, bukan syarat masuk. Bila tabelnya belum ada --
+    // misalnya migrasi belum dijalankan setelah pembaruan -- login harus tetap
+    // berfungsi, bukan ikut jatuh. Kegagalannya dicatat agar tetap ketahuan.
+    if (!tabel_batas_ada($conn)) {
+        return 0;
+    }
+
     // Sisa waktu dihitung di dalam SQL, bukan dengan membandingkan MAX(waktu)
     // terhadap time() milik PHP. Zona waktu MySQL dan PHP bisa berbeda, dan
     // selisihnya langsung muncul sebagai lama blokir yang keliru -- pada
@@ -48,8 +55,34 @@ function sisa_blokir($conn, string $ip): int
     return (int) $r['sisa'];
 }
 
+/** Sekali periksa per permintaan; hasilnya diingat agar tidak berulang. */
+function tabel_batas_ada($conn): bool
+{
+    static $ada = null;
+
+    if ($ada === null) {
+        try {
+            $r = $conn->query("SHOW TABLES LIKE 'login_gagal'");
+            $ada = $r && $r->num_rows > 0;
+        } catch (mysqli_sql_exception $e) {
+            $ada = false;
+        }
+
+        if (!$ada) {
+            error_log('Tabel login_gagal belum ada; pembatasan percobaan login tidak aktif. '
+                    . 'Jalankan database/migrations/005-batas-login.sql.');
+        }
+    }
+
+    return $ada;
+}
+
 function catat_gagal($conn, string $ip, string $username): void
 {
+    if (!tabel_batas_ada($conn)) {
+        return;
+    }
+
     $stmt = $conn->prepare("INSERT INTO login_gagal (ip, username) VALUES (?, ?)");
     $stmt->bind_param("ss", $ip, $username);
     $stmt->execute();
@@ -62,9 +95,31 @@ function catat_gagal($conn, string $ip, string $username): void
 
 function bersihkan_gagal($conn, string $ip): void
 {
+    if (!tabel_batas_ada($conn)) {
+        return;
+    }
+
     $stmt = $conn->prepare("DELETE FROM login_gagal WHERE ip = ?");
     $stmt->bind_param("s", $ip);
     $stmt->execute();
+}
+
+/** Jumlah percobaan gagal dari IP ini dalam jendela waktu berjalan. */
+function jumlah_gagal($conn, string $ip): int
+{
+    if (!tabel_batas_ada($conn)) {
+        return 0;
+    }
+
+    $stmt = $conn->prepare(
+        "SELECT COUNT(*) AS n FROM login_gagal
+          WHERE ip = ? AND waktu > (NOW() - INTERVAL ? SECOND)"
+    );
+    $jendela = LOGIN_JENDELA;
+    $stmt->bind_param("si", $ip, $jendela);
+    $stmt->execute();
+
+    return (int) $stmt->get_result()->fetch_assoc()['n'];
 }
 
 /** "3 menit" atau "45 detik" -- lebih mudah dibaca daripada detik mentah. */
