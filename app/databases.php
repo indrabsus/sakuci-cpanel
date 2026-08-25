@@ -4,6 +4,7 @@ include '../config/auth.php';
 include '../config/mysql-admin.php';
 include '../config/env-writer.php';
 include '../config/files.php';
+include '../config/db-tools.php';
 
 $user = require_login($conn);
 $user_id = $user['id'];
@@ -50,6 +51,93 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'hapus
             $del->execute();
 
             $pesan = 'ok|Database ' . $row['db_name'] . ' dihapus beserta seluruh isinya.';
+        }
+    }
+
+    header('Location: databases.php?pesan=' . urlencode($pesan));
+    exit;
+}
+
+/** Mengambil database beserta kredensialnya, disaring kepemilikan. */
+function ambil_database($conn, int $db_id, int $user_id, bool $isAdmin): ?array
+{
+    $sql = "SELECT d.id, d.db_name, d.db_host, d.db_port, du.username, du.password
+              FROM db_list d
+              LEFT JOIN db_users du ON du.db_id = d.id
+             WHERE d.id = ?" . ($isAdmin ? "" : " AND d.user_id = ?");
+    $q = $conn->prepare($sql);
+    if ($isAdmin) {
+        $q->bind_param("i", $db_id);
+    } else {
+        $q->bind_param("ii", $db_id, $user_id);
+    }
+    $q->execute();
+
+    return $q->get_result()->fetch_assoc() ?: null;
+}
+
+// Impor berkas SQL.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor') {
+    $db_id = intval($_POST['db_id'] ?? 0);
+    $d = ambil_database($conn, $db_id, $user_id, $isAdmin);
+    $f = $_FILES['berkas'] ?? null;
+
+    if (!$d || !$d['username']) {
+        $pesan = 'err|Database tidak ditemukan.';
+    } elseif (!$f || $f['error'] === UPLOAD_ERR_NO_FILE) {
+        $pesan = 'err|Pilih berkas .sql lebih dulu.';
+    } elseif ($f['error'] === UPLOAD_ERR_INI_SIZE || $f['error'] === UPLOAD_ERR_FORM_SIZE) {
+        $pesan = 'err|Berkas terlalu besar untuk diunggah server.';
+    } elseif ($f['error'] !== UPLOAD_ERR_OK) {
+        $pesan = 'err|Gagal mengunggah berkas.';
+    } elseif ($f['size'] > IMPOR_MAKS_BYTE) {
+        $pesan = 'err|Berkas melebihi ' . (IMPOR_MAKS_BYTE / 1024 / 1024) . ' MB.';
+    } elseif (strtolower(pathinfo($f['name'], PATHINFO_EXTENSION)) !== 'sql') {
+        $pesan = 'err|Hanya berkas berakhiran .sql yang bisa diimpor.';
+    } else {
+        // is_uploaded_file memastikan berkasnya memang hasil unggahan, bukan
+        // path lain yang disisipkan lewat isian form.
+        $isi = is_uploaded_file($f['tmp_name']) ? file_get_contents($f['tmp_name']) : false;
+
+        if ($isi === false || trim($isi) === '') {
+            $pesan = 'err|Berkas kosong atau tidak terbaca.';
+        } else {
+            $sambung = sambung_sebagai_siswa($d);
+
+            if (!$sambung['ok']) {
+                $pesan = 'err|' . $sambung['pesan'];
+            } else {
+                $hasil = impor_sql($sambung['conn'], $isi);
+                $sambung['conn']->close();
+
+                $pesan = $hasil['ok']
+                    ? 'ok|Impor selesai ke ' . $d['db_name'] . '. ' . $hasil['pesan']
+                    : 'err|Impor gagal pada pernyataan ke-' . $hasil['jumlah'] . ': ' . $hasil['pesan'];
+            }
+        }
+    }
+
+    header('Location: databases.php?pesan=' . urlencode($pesan));
+    exit;
+}
+
+// Menghapus seluruh tabel.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'kosongkan') {
+    $db_id = intval($_POST['db_id'] ?? 0);
+    $d = ambil_database($conn, $db_id, $user_id, $isAdmin);
+
+    if (!$d || !$d['username']) {
+        $pesan = 'err|Database tidak ditemukan.';
+    } else {
+        $sambung = sambung_sebagai_siswa($d);
+
+        if (!$sambung['ok']) {
+            $pesan = 'err|' . $sambung['pesan'];
+        } else {
+            $hasil = kosongkan_database($sambung['conn']);
+            $sambung['conn']->close();
+
+            $pesan = ($hasil['ok'] ? 'ok|' : 'err|') . $d['db_name'] . ': ' . $hasil['pesan'];
         }
     }
 
@@ -280,6 +368,12 @@ if ($result) {
         .env-blok { background: #1a202c; color: #e2e8f0; padding: .85rem; border-radius: 5px; font-family: ui-monospace, Consolas, monospace; font-size: .82rem; line-height: 1.5; overflow-x: auto; white-space: pre; }
         .btn-salin { margin-top: .5rem; padding: .35rem .9rem; font-size: .85rem; background: #4a5568; }
         .btn-salin:hover { background: #2d3748; }
+        .alat-db { margin-top: .85rem; padding-top: .85rem; border-top: 1px solid #edf2f7; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+        .alat-impor { display: flex; gap: .5rem; align-items: center; }
+        .alat-impor input[type=file] { font-size: .82rem; max-width: 15rem; padding: .3rem; border: 1px solid #e2e8f0; border-radius: 5px; background: white; }
+        .btn-kecil { padding: .4rem .9rem; font-size: .85rem; }
+        .btn-hati { background: #a0aec0; }
+        .btn-hati:hover { background: #c53030; }
         .akses-kosong { margin-top: .5rem; font-size: .88rem; color: #a0aec0; }
         .btn-danger { background: #a0aec0; padding: .5rem 1rem; font-size: .9rem; }
         .btn-danger:hover { background: #c53030; }
@@ -394,6 +488,27 @@ Pengaturan DB_ yang ada sekarang akan diganti.');">
                         <?php else: ?>
                             <p class="akses-kosong">Kredensial tidak tercatat untuk database ini.</p>
                         <?php endif; ?>
+
+                        <div class="alat-db">
+                            <form method="POST" enctype="multipart/form-data" class="alat-impor"
+                                  onsubmit="return this.berkas.files.length > 0;">
+                                <input type="hidden" name="action" value="impor">
+                                <input type="hidden" name="db_id" value="<?php echo (int) $db['id']; ?>">
+                                <input type="file" name="berkas" accept=".sql" required>
+                                <button type="submit" class="btn btn-kecil">📥 Impor SQL</button>
+                            </form>
+
+                            <form method="POST" style="display:inline"
+                                  onsubmit="return confirm('Hapus SEMUA tabel di <?php echo htmlspecialchars($db['db_name'], ENT_QUOTES); ?>?
+
+Seluruh data di dalamnya hilang permanen. Databasenya sendiri tetap ada, hanya isinya yang dikosongkan.
+
+Tidak bisa dikembalikan.');">
+                                <input type="hidden" name="action" value="kosongkan">
+                                <input type="hidden" name="db_id" value="<?php echo (int) $db['id']; ?>">
+                                <button type="submit" class="btn btn-kecil btn-hati">🧹 Hapus Semua Tabel</button>
+                            </form>
+                        </div>
 
                         <form method="POST" style="margin-top:.75rem"
                               onsubmit="return confirm('Hapus database <?php echo htmlspecialchars($db['db_name'], ENT_QUOTES); ?>?
