@@ -127,6 +127,10 @@ function valid_filename(string $name): bool
 function delete_recursive(string $path): bool
 {
     if (is_link($path) || is_file($path)) {
+        // Berkas read-only (git menandai objeknya begitu) menolak unlink() di
+        // Windows; chmod dulu agar penghapusan tuntas di kedua platform.
+        @chmod($path, 0666);
+
         return @unlink($path);
     }
 
@@ -142,6 +146,8 @@ function delete_recursive(string $path): bool
             return false;
         }
     }
+
+    @chmod($path, 0777);
 
     return @rmdir($path);
 }

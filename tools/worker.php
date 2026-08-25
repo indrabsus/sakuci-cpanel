@@ -16,9 +16,41 @@ if (PHP_SAPI !== 'cli') {
 }
 
 require __DIR__ . '/../config/config.php';
+require __DIR__ . '/../config/framework-check.php';
 
 const JOB_TIMEOUT = 600;   // detik, batas satu perintah git
 const MAX_PER_RUN = 5;     // agar satu putaran cron tidak berjalan terlalu lama
+
+// Menolak repo yang bukan project Sakuci. Diatur lewat 'wajib_sakuci' di
+// config/env.php; kosongkan menjadi false bila panel dipakai untuk framework lain.
+define('WAJIB_SAKUCI', $env['wajib_sakuci'] ?? true);
+
+/** Membuang folder sementara beserta isinya. */
+function delete_recursive_worker(string $path): bool
+{
+    if (is_link($path) || is_file($path)) {
+        // git menandai berkas objeknya read-only. Di Windows, unlink() menolak
+        // berkas read-only, sehingga folder sementara tertinggal saat clone
+        // ditolak. chmod dulu agar pembersihan tuntas di kedua platform.
+        @chmod($path, 0666);
+
+        return @unlink($path);
+    }
+    if (!is_dir($path)) {
+        return false;
+    }
+    foreach (scandir($path) ?: [] as $n) {
+        if ($n === '.' || $n === '..') {
+            continue;
+        }
+        if (!delete_recursive_worker($path . DIRECTORY_SEPARATOR . $n)) {
+            return false;
+        }
+    }
+    @chmod($path, 0777);
+
+    return @rmdir($path);
+}
 
 /** Mencegah dua cron tumpang tindih saat satu pekerjaan berjalan lama. */
 $lock = fopen(sys_get_temp_dir() . '/sakuci-cpanel-worker.lock', 'c');
@@ -127,12 +159,38 @@ while ($processed < MAX_PER_RUN) {
             continue;
         }
 
+        // Di-clone ke folder sementara lebih dulu. Isinya baru bisa diperiksa
+        // setelah terunduh, dan bila ternyata bukan project Sakuci, folder
+        // tujuan tidak pernah sempat terisi -- tidak ada sisa yang harus
+        // dibereskan siswa.
+        $sementara = $path . '.tmp-' . bin2hex(random_bytes(4));
+
         [$out, $code] = git(
             'clone --branch ' . escapeshellarg($branch)
             . ' ' . escapeshellarg($job['git_url'])
-            . ' ' . escapeshellarg($path),
+            . ' ' . escapeshellarg($sementara),
             $parent
         );
+
+        if ($code === 0 && WAJIB_SAKUCI) {
+            $cek = periksa_sakuci($sementara);
+
+            if (!$cek['ok']) {
+                delete_recursive_worker($sementara);
+                finish($conn, $id, 'failed', pesan_bukan_sakuci($cek['kurang']));
+                continue;
+            }
+        }
+
+        if ($code === 0 && !@rename($sementara, $path)) {
+            delete_recursive_worker($sementara);
+            finish($conn, $id, 'failed', "Gagal memindahkan hasil clone ke $path");
+            continue;
+        }
+
+        if ($code !== 0) {
+            delete_recursive_worker($sementara);
+        }
     } else {
         if (!is_dir($path . '/.git')) {
             finish($conn, $id, 'failed', "Bukan repo git: $path");

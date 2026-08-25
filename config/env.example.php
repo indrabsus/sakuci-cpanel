@@ -45,6 +45,13 @@ return [
     // http://budi.uk.sakuci.id -- tanpa perlu konfigurasi per project.
     // Butuh record DNS wildcard: *.uk.sakuci.id -> IP server.
     // Kosongkan bila belum disiapkan; panel hanya tidak menampilkan tautannya.
+    // Menolak repo yang bukan project Sakuci Framework saat di-clone.
+    // Yang diperiksa strukturnya (core/, routes/, public/index.php, CLI sakuci),
+    // bukan kunci rahasia -- repo framework bersifat publik sehingga kunci apa
+    // pun di dalamnya bisa disalin siapa saja.
+    // Set false bila panel dipakai untuk framework lain.
+    'wajib_sakuci' => true,
+
     'site_domain' => 'uk.sakuci.id',
 
     // Alamat phpMyAdmin. Di aaPanel biasanya di port 888 dengan nama folder
