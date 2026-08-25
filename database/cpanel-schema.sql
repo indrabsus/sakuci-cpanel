@@ -99,3 +99,13 @@ CREATE TABLE IF NOT EXISTS job_queue (
   CONSTRAINT job_queue_ibfk_2 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+-- Catatan percobaan login gagal, untuk membatasi penebakan PIN enam angka.
+CREATE TABLE IF NOT EXISTS login_gagal (
+  id       int         NOT NULL AUTO_INCREMENT,
+  ip       varchar(45) NOT NULL,
+  username varchar(50) DEFAULT NULL,
+  waktu    timestamp   NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_ip_waktu (ip, waktu)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

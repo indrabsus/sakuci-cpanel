@@ -70,12 +70,9 @@ foreach ($names as $username) {
     }
 
     if ($acak) {
-        // Tanpa karakter yang mudah tertukar saat dibacakan di kelas.
-        $abjad = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        $password = '';
-        for ($i = 0; $i < 12; $i++) {
-            $password .= $abjad[random_int(0, strlen($abjad) - 1)];
-        }
+        // PIN enam angka: mudah dibacakan dan diketik siswa. Ruang tebakannya
+        // kecil, jadi hanya layak bersama pembatasan percobaan login.
+        $password = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
     } else {
         $password = readSecret("Password untuk '$username': ");
         $ulang    = readSecret("Ulangi                  : ");
@@ -84,8 +81,8 @@ foreach ($names as $username) {
             $dilewati[] = "$username (password tidak sama)";
             continue;
         }
-        if (strlen($password) < 8) {
-            $dilewati[] = "$username (password minimal 8 karakter)";
+        if (strlen($password) < 6) {
+            $dilewati[] = "$username (password minimal 6 karakter)";
             continue;
         }
     }

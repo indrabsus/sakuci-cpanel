@@ -2,6 +2,19 @@
 include '../config/config.php';
 include '../config/auth.php';
 
+/**
+ * Membuat PIN enam angka.
+ *
+ * Dipilih angka saja agar mudah dibacakan dan diketik siswa. Ruang tebakannya
+ * hanya sejuta kemungkinan, jadi ini hanya layak dipakai bersama pembatasan
+ * percobaan login -- tanpa itu, PIN semacam ini bisa ditebak mesin dalam
+ * hitungan menit.
+ */
+function buat_pin(): string
+{
+    return str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+}
+
 $me = require_admin($conn);
 $username = $me['username'];
 
@@ -21,12 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!preg_match('/^[a-z][a-z0-9_]{2,31}$/', $nama)) {
             $pesan = 'err|Username hanya boleh huruf kecil, angka, dan garis bawah (3-32 karakter).';
         } else {
-            // Password diacak tanpa karakter yang mudah tertukar saat dibacakan.
-            $abjad = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-            $pw = '';
-            for ($i = 0; $i < 12; $i++) {
-                $pw .= $abjad[random_int(0, strlen($abjad) - 1)];
-            }
+            $pw = buat_pin();
 
             try {
                 $hash = password_hash($pw, PASSWORD_DEFAULT);
@@ -57,11 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$target) {
             $pesan = 'err|Akun tidak ditemukan.';
         } else {
-            $abjad = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-            $pw = '';
-            for ($i = 0; $i < 12; $i++) {
-                $pw .= $abjad[random_int(0, strlen($abjad) - 1)];
-            }
+            $pw = buat_pin();
             $hash = password_hash($pw, PASSWORD_DEFAULT);
 
             $upd = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");

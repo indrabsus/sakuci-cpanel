@@ -1,6 +1,7 @@
 <?php
 include 'config/config.php';
 include 'config/auth.php';
+include 'config/login-limit.php';
 
 if (isset($_GET['logout'])) {
     clear_session();
@@ -16,37 +17,52 @@ if (current_user($conn)) {
 }
 
 $error = isset($_GET['expired']) ? '❌ Sesi Anda sudah tidak berlaku. Silakan login kembali.' : '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
+    $ip = ip_pemanggil();
 
-    if (!empty($username) && !empty($password)) {
-        $stmt = $conn->prepare("SELECT id, password FROM users WHERE username = ?");
-        if ($stmt) {
-            $stmt->bind_param("s", $username);
-            $stmt->execute();
-            $result = $stmt->get_result();
+    // Diperiksa SEBELUM password dicocokkan, supaya percobaan yang diblokir
+    // tidak ikut membebani pencocokan bcrypt.
+    $sisa = sisa_blokir($conn, $ip);
 
-            if ($result && $result->num_rows === 1) {
-                $user = $result->fetch_assoc();
-                if (password_verify($password, $user['password'])) {
-                    $_SESSION['user_id'] = $user['id'];
-                    $_SESSION['username'] = $username;
-                    header("Location: app/dashboard.php");
-                    exit;
-                } else {
-                    $error = "❌ Password salah";
-                }
-            } else {
-                $error = "❌ Username tidak ditemukan";
-            }
-        } else {
-            $error = "❌ Database error";
-        }
+    if ($sisa > 0) {
+        $error = '❌ Terlalu banyak percobaan gagal. Coba lagi dalam '
+               . sebut_durasi($sisa) . '.';
+    } elseif (empty($username) || empty($password)) {
+        $error = '❌ Username dan password harus diisi';
     } else {
-        $error = "❌ Username dan password harus diisi";
+        $stmt = $conn->prepare("SELECT id, password FROM users WHERE username = ?");
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $user = $result ? $result->fetch_assoc() : null;
+
+        if ($user && password_verify($password, $user['password'])) {
+            bersihkan_gagal($conn, $ip);
+
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['username'] = $username;
+            header("Location: app/dashboard.php");
+            exit;
+        }
+
+        catat_gagal($conn, $ip, $username);
+
+        // Pesan sengaja sama untuk username salah maupun password salah:
+        // membedakannya memberi tahu penebak akun mana yang benar-benar ada.
+        $tersisa = LOGIN_MAKS_GAGAL - (int) $conn->query(
+            "SELECT COUNT(*) AS n FROM login_gagal
+              WHERE ip = '" . $conn->real_escape_string($ip) . "'
+                AND waktu > (NOW() - INTERVAL " . LOGIN_JENDELA . " SECOND)"
+        )->fetch_assoc()['n'];
+
+        $error = '❌ Username atau password salah.'
+               . ($tersisa > 0 && $tersisa <= 2 ? ' Sisa ' . $tersisa . ' percobaan.' : '');
     }
 }
+
 ?>
 <!DOCTYPE html>
 <html>
