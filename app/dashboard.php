@@ -6,7 +6,18 @@ $user = require_login($conn);
 $user_id = $user['id'];
 $username = $user['username'];
 
-// Get projects
+// Pesan dari halaman lain, mis. setelah menambah project.
+$pesanOk = '';
+$pesanErr = '';
+if (isset($_GET['pesan']) && str_contains((string) $_GET['pesan'], '|')) {
+    [$jenis, $teks] = explode('|', (string) $_GET['pesan'], 2);
+    if ($jenis === 'ok') {
+        $pesanOk = htmlspecialchars($teks);
+    } else {
+        $pesanErr = htmlspecialchars($teks);
+    }
+}
+
 // Admin melihat milik semua orang; siswa hanya miliknya sendiri.
 $admin = is_admin($user);
 $projects = [];
@@ -56,6 +67,9 @@ if ($result) {
         .project-name { font-weight: 600; color: #333; font-size: 1.1rem; }
         .project-info { color: #666; font-size: 0.9rem; margin-top: 0.5rem; }
         .logout { color: #e53e3e; }
+        .pesan { padding: .85rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: .95rem; }
+        .pesan-ok { background: #f0fff4; color: #22543d; border: 1px solid #9ae6b4; }
+        .pesan-err { background: #fff5f5; color: #822727; border: 1px solid #feb2b2; }
         .owner-tag { font-size: .78rem; font-weight: 500; background: #edf2f7; color: #4a5568; padding: .15rem .5rem; border-radius: 999px; margin-left: .5rem; vertical-align: middle; }
     </style>
     <?php // ?v=<waktu ubah> memaksa browser mengambil ulang begitu berkas berubah;
@@ -78,6 +92,9 @@ if ($result) {
             </div>
             <a href="../index.php?logout=1" class="logout">Logout</a>
         </div>
+
+        <?php if ($pesanOk): ?><div class="pesan pesan-ok">✅ <?php echo $pesanOk; ?></div><?php endif; ?>
+        <?php if ($pesanErr): ?><div class="pesan pesan-err">❌ <?php echo $pesanErr; ?></div><?php endif; ?>
 
         <div class="stats">
             <div class="stat">

@@ -8,41 +8,63 @@ $username = $user['username'];
 $error = '';
 $success = '';
 
+// Pola POST-redirect-GET: tanpa ini, menekan refresh setelah submit akan
+// mengirim ulang form dan membuat project ganda.
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $domain = trim($_POST['domain'] ?? '');
     $git_url = trim($_POST['git_url'] ?? '');
     $git_branch = trim($_POST['git_branch'] ?? 'main');
 
-    if (empty($name) || empty($domain) || empty($git_url)) {
-        $error = '❌ Semua field harus diisi';
-    } else {
-        $local_path = PROJECTS_PATH . '/' . preg_replace('/[^a-zA-Z0-9-_]/', '', $domain);
+    // Domain dinormalkan lebih dulu, bukan sekadar dibersihkan saat membentuk
+    // path. Kalau tidak, "My-App" dan "myapp" tampil berbeda di daftar padahal
+    // menunjuk folder dan subdomain yang sama.
+    $domain = strtolower(preg_replace('/[^a-zA-Z0-9-]/', '', $domain));
 
-        // mysqli throws on error here, so catch it rather than letting a fatal
-        // dump a stack trace with server paths at the user.
+    if (empty($name) || empty($domain) || empty($git_url)) {
+        $pesan = 'err|Semua field harus diisi.';
+    } elseif (!preg_match('/^[a-z][a-z0-9-]{2,29}$/', $domain)) {
+        $pesan = 'err|Domain harus 3-30 karakter, diawali huruf, hanya huruf kecil, angka, dan tanda hubung.';
+    } else {
+        $local_path = PROJECTS_PATH . '/' . $domain;
+
         try {
-            $stmt = $conn->prepare("INSERT INTO projects (user_id, name, domain, git_url, git_branch, local_path, status) VALUES (?, ?, ?, ?, ?, ?, 'active')");
+            $stmt = $conn->prepare(
+                "INSERT INTO projects (user_id, name, domain, git_url, git_branch, local_path, status)
+                 VALUES (?, ?, ?, ?, ?, ?, 'active')"
+            );
             $stmt->bind_param("isssss", $user_id, $name, $domain, $git_url, $git_branch, $local_path);
             $stmt->execute();
 
-            $project_id = $conn->insert_id;
-            $success = "✅ Project berhasil ditambahkan! ID: $project_id";
+            // Diarahkan ke dashboard: di sanalah tombol Clone, Buka Web, dan
+            // File berada, jadi siswa langsung bisa melanjutkan.
+            header('Location: dashboard.php?pesan=' . urlencode(
+                'ok|Project "' . $name . '" ditambahkan. Klik Clone untuk mengambil kodenya.'
+            ));
+            exit;
         } catch (mysqli_sql_exception $e) {
             error_log('add-project insert failed: ' . $e->getMessage());
-            $error = '❌ Gagal menyimpan project. Silakan coba lagi.';
+
+            // Indeks unik pada local_path yang menahan domain kembar.
+            $pesan = str_contains($e->getMessage(), 'Duplicate')
+                ? 'err|Domain "' . $domain . '" sudah dipakai. Pilih nama lain.'
+                : 'err|Gagal menyimpan project. Coba lagi.';
         }
+    }
+
+    header('Location: add-project.php?pesan=' . urlencode($pesan));
+    exit;
+}
+
+if (isset($_GET['pesan']) && str_contains((string) $_GET['pesan'], '|')) {
+    [$jenis, $teks] = explode('|', (string) $_GET['pesan'], 2);
+    if ($jenis === 'ok') {
+        $success = '✅ ' . htmlspecialchars($teks);
+    } else {
+        $error = '❌ ' . htmlspecialchars($teks);
     }
 }
 
-// Get projects
-$projects = [];
-$result = $conn->query("SELECT * FROM projects WHERE user_id = $user_id ORDER BY created_at DESC");
-if ($result) {
-    while ($row = $result->fetch_assoc()) {
-        $projects[] = $row;
-    }
-}
 ?>
 <!DOCTYPE html>
 <html>
@@ -137,49 +159,6 @@ if ($result) {
             </form>
         </div>
 
-        <div class="section">
-            <h2>📋 Project Anda</h2>
-
-            <?php if (!empty($projects)): ?>
-                <?php foreach ($projects as $proj): ?>
-                    <?php $cloned = is_dir($proj['local_path']); ?>
-                    <div class="project-item" data-project="<?php echo $proj['id']; ?>">
-                        <div style="display: flex; justify-content: space-between; align-items: start;">
-                            <div>
-                                <h3><?php echo htmlspecialchars($proj['name']); ?></h3>
-                                <div class="project-meta">
-                                    Domain: <strong><?php echo htmlspecialchars($proj['domain']); ?></strong><br>
-                                    URL: <code><?php echo htmlspecialchars($proj['git_url']); ?></code><br>
-                                    Branch: <strong><?php echo htmlspecialchars($proj['git_branch']); ?></strong><br>
-                                    Created: <?php echo date('d M Y H:i', strtotime($proj['created_at'])); ?>
-                                </div>
-                            </div>
-                            <span class="status-badge status-<?php echo $proj['status']; ?>">
-                                <?php echo ucfirst($proj['status']); ?>
-                            </span>
-                        </div>
-                        <div class="git-actions">
-                            <?php if ($cloned): ?>
-                                <button class="git-btn" data-action="pull">⬇️ Pull</button>
-                                <span class="git-status">
-                                    <?php echo $proj['last_pull']
-                                        ? 'Last pull: ' . date('d M Y H:i', strtotime($proj['last_pull']))
-                                        : 'Belum pernah di-pull'; ?>
-                                </span>
-                            <?php else: ?>
-                                <button class="git-btn" data-action="clone">📥 Clone</button>
-                                <span class="git-status">Belum di-clone ke server</span>
-                            <?php endif; ?>
-                            <button class="git-btn git-btn-danger" data-action="delete"
-                                    data-name="<?php echo htmlspecialchars($proj['name'], ENT_QUOTES); ?>">🗑 Hapus</button>
-                        </div>
-                        <pre class="git-output"></pre>
-                    </div>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <p style="color: #666; text-align: center; padding: 2rem;">Anda belum menambahkan project apapun.</p>
-            <?php endif; ?>
-        </div>
     </div>
     <script src="assets/git-actions.js?v=<?php echo filemtime(__DIR__ . "/assets/git-actions.js"); ?>"></script>
 </body>

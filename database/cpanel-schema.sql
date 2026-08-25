@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS projects (
   created_at  timestamp    NULL DEFAULT CURRENT_TIMESTAMP,
   last_pull   timestamp    NULL DEFAULT NULL,
   PRIMARY KEY (id),
+  -- Unik agar dua project tidak menunjuk folder dan subdomain yang sama.
+  UNIQUE KEY unik_local_path (local_path),
   KEY idx_user_id (user_id),
   CONSTRAINT projects_ibfk_1 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
