@@ -159,15 +159,14 @@
 
             editor = monaco.editor.create(document.getElementById('monaco-container'), {
                 theme: 'vs-dark',
-                fontSize: isMobile ? 14 : 13.5,
+                fontSize: isMobile ? 13 : 13.5,
                 fontFamily: "'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace",
                 lineNumbers: 'on',
                 lineNumbersMinChars: isMobile ? 3 : 5,
                 glyphMargin: false,
                 folding: !isMobile,
                 roundedSelection: true,
-                scrollBeyondLastLine: true, // Pastikan bisa scroll leluasa sampai baris paling akhir
-                scrollBeyondLastColumn: 5,
+                scrollBeyondLastLine: true, // KUNCI: Memungkinkan gulir bebas melewati baris terakhir sampai tuntas
                 readOnly: false,
                 tabSize: 4,
                 automaticLayout: true,
@@ -176,21 +175,8 @@
                 autoClosingBrackets: 'always',
                 autoClosingQuotes: 'always',
                 cursorBlinking: 'smooth',
-                wordWrap: isMobile ? 'on' : 'off', // Di HP bungkus kata agar tidak scroll horizontal berlebih
-                wrappingStrategy: 'advanced',
-                overviewRulerLanes: isMobile ? 0 : 2,
-                scrollbar: {
-                    vertical: 'auto',
-                    horizontal: 'auto',
-                    verticalScrollbarSize: isMobile ? 14 : 10,
-                    horizontalScrollbarSize: isMobile ? 14 : 10,
-                    alwaysConsumeMouseWheel: false,
-                    useShadows: false,
-                },
-                smoothScrolling: true,
-                mouseWheelScrollSensitivity: 1,
-                fastScrollSensitivity: 5,
-                padding: { top: 8, bottom: isMobile ? 240 : 60 }, // Ruang scroll lega di bagian bawah di HP
+                wordWrap: 'off', // JANGAN bungkus kode agar sintaks tetap lurus dan sangat mudah dibaca
+                padding: { top: 8, bottom: isMobile ? 120 : 20 }, // Ruang ekstra di bawah agar baris terakhir tidak terhalang tombol
             });
 
             // Auto-closing tag saat mengetik '>'
@@ -1259,32 +1245,24 @@
             }
         });
 
-        // Responsif saat rotasi HP, resize jendela, atau keyboard virtual muncul/hilang
-        function handleMobileResize() {
+        // Responsif saat rotasi HP atau resize jendela
+        window.addEventListener('resize', () => {
             const isMobile = window.innerWidth <= 768;
             if (editor) {
                 editor.updateOptions({
                     minimap: { enabled: !isMobile },
-                    fontSize: isMobile ? 14 : 13.5,
+                    fontSize: isMobile ? 13 : 13.5,
                     lineNumbersMinChars: isMobile ? 3 : 5,
                     scrollBeyondLastLine: true,
-                    wordWrap: isMobile ? 'on' : 'off',
-                    overviewRulerLanes: isMobile ? 0 : 2,
+                    wordWrap: 'off',
                     padding: {
                         top: 8,
-                        bottom: isMobile ? 240 : 60
+                        bottom: isMobile ? 120 : 20
                     }
                 });
                 editor.layout();
             }
-        }
-
-        window.addEventListener('resize', handleMobileResize);
-        if (window.visualViewport) {
-            window.visualViewport.addEventListener('resize', () => {
-                if (editor) editor.layout();
-            });
-        }
+        });
     });
 
 })();
