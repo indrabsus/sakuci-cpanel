@@ -29,13 +29,18 @@ function ikon(string $nama): string
  */
 function layout_start(string $judul, string $subjudul, string $aktif, array $user, array $aksi = []): void
 {
-    $menu = [
-        'dashboard' => ['Dashboard',   'dashboard.php',   'grid'],
-        'add'       => ['Tambah Project', 'add-project.php', 'plus'],
-        'db'        => ['Database',    'databases.php',   'db'],
-    ];
     if (is_admin($user)) {
-        $menu['users'] = ['Pengguna', 'users.php', 'users'];
+        $menu = [
+            'dashboard' => ['Dashboard', 'dashboard.php', 'grid'],
+            'db'        => ['Database',  'databases.php', 'db'],
+            'users'     => ['Pengguna',  'users.php',     'users'],
+        ];
+    } else {
+        $menu = [
+            'dashboard' => ['Dashboard',      'dashboard.php',   'grid'],
+            'add'       => ['Tambah Project', 'add-project.php', 'plus'],
+            'db'        => ['Database',       'databases.php',   'db'],
+        ];
     }
 
     $v = fn(string $f) => htmlspecialchars($f) . '?v=' . @filemtime(__DIR__ . '/../assets/' . $f);
@@ -46,9 +51,6 @@ function layout_start(string $judul, string $subjudul, string $aktif, array $use
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?php echo htmlspecialchars($judul); ?> &middot; Sakuci cPanel</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;550;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/<?php echo $v('panel.css'); ?>">
 <link rel="stylesheet" href="assets/<?php echo $v('git-actions.css'); ?>">
 </head>

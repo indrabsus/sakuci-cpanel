@@ -195,11 +195,27 @@ if (isset($_GET['pesan']) && str_contains((string) $_GET['pesan'], '|')) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if ($isAdmin) {
+        $error = 'Administrator hanya bertugas memantau dan tidak diperkenankan membuat database.';
+    } else {
+        // Cek kuota database siswa (maksimal 1)
+        $stmtCekDb = $conn->prepare("SELECT COUNT(*) AS total FROM db_list WHERE user_id = ?");
+        $stmtCekDb->bind_param("i", $user_id);
+        $stmtCekDb->execute();
+        $userDbCount = (int) $stmtCekDb->get_result()->fetch_assoc()['total'];
+
+        if ($userDbCount >= 1) {
+            $error = 'Batas kuota tercapai: Setiap siswa hanya diperbolehkan memiliki maksimal 1 database. Hapus database yang ada jika ingin membuat database baru.';
+        }
+    }
+
     $raw = strtolower(trim($_POST['db_name'] ?? ''));
     $db_name = 'db_' . preg_replace('/[^a-z0-9_]/', '', $raw);
     $project_id = intval($_POST['project_id'] ?? 0);
 
-    if ($raw === '' || $project_id <= 0) {
+    if (!empty($error)) {
+        // Jangan lanjutkan pembuatan jika ada error batasan kuota / peran admin
+    } elseif ($raw === '' || $project_id <= 0) {
         $error = 'Nama database dan project harus diisi';
     } elseif (!valid_mysql_identifier($db_name)) {
         $error = 'Nama hanya boleh huruf kecil, angka, dan garis bawah (minimal 3 karakter)';
@@ -329,56 +345,75 @@ if ($result) {
     }
 }
 
-layout_start('Database', $isAdmin ? 'Seluruh database di panel ini' : 'Database milik Anda', 'db', $user);
+layout_start('Database', $isAdmin ? 'Mode Pemantauan &mdash; Memantau seluruh database milik siswa' : 'Database milik Anda (Maksimal 1 database per siswa)', 'db', $user);
 ?>
 
 <?php if ($error): ?><div class="note note-err"><?php echo $error; ?></div><?php endif; ?>
 <?php if ($success): ?><div class="note note-ok"><?php echo $success; ?></div><?php endif; ?>
 
-<div class="card" style="max-width:640px">
-    <div class="card-h">
-        <div>
-            <h2>Database Baru</h2>
-            <p>Kredensial dibuat otomatis dan langsung ditulis ke .env project</p>
+<?php if (!$isAdmin): ?>
+    <?php if (count($databases) >= 1): ?>
+        <div class="card" style="max-width:640px">
+            <div class="card-h">
+                <div>
+                    <h2>Kuota Database Anda</h2>
+                    <p><span class="pill pill-warn" style="background:#fef3c7; color:#92400e; font-weight:600">1 / 1 Database Digunakan (Kuota Penuh)</span></p>
+                </div>
+            </div>
+            <div class="card-b">
+                <p style="color:var(--ink-2); font-size:13.5px; line-height:1.6; margin:0">
+                    Setiap akun siswa dibatasi maksimal <strong>1 database</strong>. Anda saat ini menggunakan database <code><?php echo htmlspecialchars($databases[0]['db_name'] ?? ''); ?></code>.<br>
+                    Jika Anda ingin membuat database dengan nama lain, kosongkan tabel atau hapus database yang ada di bawah ini terlebih dahulu.
+                </p>
+            </div>
         </div>
-    </div>
-    <div class="card-b">
-        <?php if (!$projects): ?>
-            <p class="dim">Tambahkan project lebih dulu sebelum membuat database.</p>
-        <?php else: ?>
-        <form method="POST" class="row">
-            <div>
-                <label for="d-proyek">Project</label>
-                <select id="d-proyek" name="project_id" required>
-                    <option value="">Pilih project</option>
-                    <?php foreach ($projects as $proj): ?>
-                        <option value="<?php echo $proj['id']; ?>"><?php echo htmlspecialchars($proj['name']); ?></option>
-                    <?php endforeach; ?>
-                </select>
+    <?php else: ?>
+        <div class="card" style="max-width:640px">
+            <div class="card-h">
+                <div>
+                    <h2>Database Baru</h2>
+                    <p>Kredensial dibuat otomatis dan langsung ditulis ke .env project (Kuota: 0 / 1 Database)</p>
+                </div>
             </div>
-            <div>
-                <label for="d-nama">Nama Database</label>
-                <input id="d-nama" type="text" name="db_name" placeholder="toko" required>
+            <div class="card-b">
+                <?php if (!$projects): ?>
+                    <p class="dim">Tambahkan project lebih dulu sebelum membuat database.</p>
+                <?php else: ?>
+                <form method="POST" class="row">
+                    <div>
+                        <label for="d-proyek">Project</label>
+                        <select id="d-proyek" name="project_id" required>
+                            <option value="">Pilih project</option>
+                            <?php foreach ($projects as $proj): ?>
+                                <option value="<?php echo $proj['id']; ?>"><?php echo htmlspecialchars($proj['name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="d-nama">Nama Database</label>
+                        <input id="d-nama" type="text" name="db_name" placeholder="toko" required>
+                    </div>
+                    <div class="row-fix">
+                        <button type="submit" class="btn"><?php echo ikon('plus'); ?>Buat</button>
+                    </div>
+                </form>
+                <div class="hint" style="margin-top:.85rem">Awalan <code>db_</code> ditambahkan otomatis.</div>
+                <?php endif; ?>
             </div>
-            <div class="row-fix">
-                <button type="submit" class="btn"><?php echo ikon('plus'); ?>Buat</button>
-            </div>
-        </form>
-        <div class="hint" style="margin-top:.85rem">Awalan <code>db_</code> ditambahkan otomatis.</div>
-        <?php endif; ?>
-    </div>
-</div>
+        </div>
+    <?php endif; ?>
+<?php endif; ?>
 
 <div class="card">
     <div class="card-h">
         <div>
-            <h2>Daftar Database</h2>
-            <p><?php echo count($databases); ?> database terdaftar</p>
+            <h2><?php echo $isAdmin ? 'Daftar Database Siswa' : 'Database Anda'; ?></h2>
+            <p><?php echo $isAdmin ? count($databases) . ' database milik seluruh siswa terdaftar' : (count($databases) >= 1 ? '1 / 1 database aktif terhubung ke project Anda' : '0 database terdaftar'); ?></p>
         </div>
     </div>
 
     <?php if (!$databases): ?>
-        <div class="empty"><p>Belum ada database.</p></div>
+        <div class="empty"><p><?php echo $isAdmin ? 'Belum ada siswa yang membuat database.' : 'Belum ada database. Buat database untuk mulai menghubungkannya dengan project Anda.'; ?></p></div>
     <?php else: ?>
     <div class="card-b" style="display:grid; gap:.85rem">
         <?php foreach ($databases as $db): ?>
@@ -396,10 +431,15 @@ layout_start('Database', $isAdmin ? 'Seluruh database di panel ini' : 'Database 
                             &middot; dibuat <?php echo date('d M Y', strtotime($db['created_at'])); ?>
                         </div>
                     </div>
-                    <?php if (PHPMYADMIN_URL !== ''): ?>
-                        <a class="git-btn" target="_blank" rel="noopener noreferrer"
-                           href="<?php echo htmlspecialchars(rtrim(PHPMYADMIN_URL, '/') . '/index.php?db=' . urlencode($db['db_name'])); ?>">phpMyAdmin</a>
-                    <?php endif; ?>
+                    <div style="display:flex; gap:.45rem; align-items:center; flex-wrap:wrap">
+                        <button type="button" class="git-btn" style="background:#0284c7; color:#fff; border-color:#0369a1; font-weight:600; display:inline-flex; align-items:center; gap:5px;" onclick="openDatabaseDesigner(<?php echo (int) $db['id']; ?>, '<?php echo htmlspecialchars($db['db_name'], ENT_QUOTES); ?>')">
+                            📐 Lihat Tabel (Designer)
+                        </button>
+                        <?php if (PHPMYADMIN_URL !== ''): ?>
+                            <a class="git-btn" target="_blank" rel="noopener noreferrer"
+                               href="<?php echo htmlspecialchars(rtrim(PHPMYADMIN_URL, '/') . '/index.php?db=' . urlencode($db['db_name'])); ?>">phpMyAdmin</a>
+                        <?php endif; ?>
+                    </div>
                 </div>
 
                 <?php if ($db['db_user']): ?>
@@ -440,6 +480,11 @@ DB_PASSWORD=<?php echo htmlspecialchars($db['db_pass']); ?></pre>
                 <?php endif; ?>
 
                 <div class="git-actions" style="margin-top:.85rem; padding-top:.85rem; border-top:1px solid var(--line-soft)">
+                    <button type="button" class="git-btn" style="background:#0284c7; color:#fff; border-color:#0369a1; font-weight:600; display:inline-flex; align-items:center; gap:5px"
+                            onclick="openDatabaseDesigner(<?php echo (int) $db['id']; ?>, '<?php echo htmlspecialchars($db['db_name'], ENT_QUOTES); ?>')">
+                        📐 Lihat Tabel
+                    </button>
+
                     <form method="POST" enctype="multipart/form-data" class="alat-impor"
                           onsubmit="return this.berkas.files.length > 0;">
                         <input type="hidden" name="action" value="impor">
@@ -503,5 +548,81 @@ function salinCadangan(teks, selesai) {
     document.body.removeChild(ta);
 }
 </script>
+
+<!-- Link CSS Desainer Skema SQLyog -->
+<link rel="stylesheet" href="assets/db-designer.css?v=<?php echo @filemtime(__DIR__ . '/assets/db-designer.css'); ?>">
+
+<!-- Modal Desainer Skema Database ala SQLyog -->
+<div id="designer-modal" class="designer-modal-backdrop">
+    <div class="designer-container">
+        <!-- Top Toolbar -->
+        <div class="designer-toolbar">
+            <div class="designer-title-group">
+                <span class="designer-app-icon">📐</span>
+                <div>
+                    <div class="designer-db-title" id="designer-db-name">Database Designer</div>
+                    <div class="designer-db-meta" id="designer-db-meta">Memuat skema…</div>
+                </div>
+            </div>
+
+            <div class="designer-controls">
+                <input type="text" class="designer-search-input" placeholder="🔍 Cari tabel…" oninput="window.DB_DESIGNER && window.DB_DESIGNER.filterTables(this.value)">
+                
+                <button type="button" class="designer-btn" onclick="window.DB_DESIGNER && window.DB_DESIGNER.autoArrange()" title="Tata rapi tabel secara otomatis">
+                    🪄 <span class="btn-label">Tata Otomatis</span>
+                </button>
+                <button type="button" class="designer-btn" onclick="window.DB_DESIGNER && window.DB_DESIGNER.zoomIn()" title="Perbesar (Zoom In)">
+                    ➕
+                </button>
+                <button type="button" class="designer-btn" onclick="window.DB_DESIGNER && window.DB_DESIGNER.zoomOut()" title="Perkecil (Zoom Out)">
+                    ➖
+                </button>
+                <button type="button" class="designer-btn" onclick="window.DB_DESIGNER && window.DB_DESIGNER.resetView()" title="Reset Tampilan (100%)">
+                    <span id="designer-zoom-badge">100%</span>
+                </button>
+                <button type="button" class="designer-btn" onclick="window.DB_DESIGNER && window.DB_DESIGNER.reload()" title="Muat ulang skema">
+                    🔄
+                </button>
+                <button type="button" class="designer-btn designer-btn-close" onclick="window.DB_DESIGNER && window.DB_DESIGNER.close()" title="Tutup Desainer (Esc)">
+                    ✕ <span class="btn-label">Tutup</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Legend Strip -->
+        <div class="designer-legend">
+            <span class="designer-legend-item"><strong>Keterangan:</strong></span>
+            <span class="designer-legend-item">🔑 Primary Key</span>
+            <span class="designer-legend-item">✨ Unique</span>
+            <span class="designer-legend-item">🔗 Foreign Key</span>
+            <span class="designer-legend-item"><span class="legend-line-solid"></span> Relasi Eksplisit (InnoDB FK)</span>
+            <span class="designer-legend-item"><span class="legend-line-dashed"></span> Relasi Konvensi (Inferred)</span>
+            <span class="designer-legend-item" style="margin-left:auto; opacity:0.8">💡 Tarik header tabel untuk menggeser &middot; Scroll kanvas untuk zoom &middot; Klik 👁️ untuk data</span>
+        </div>
+
+        <!-- Canvas Viewport -->
+        <div id="designer-viewport" class="designer-viewport">
+            <div id="designer-world" class="designer-world">
+                <!-- SVG Canvas for Bezier Relation Lines -->
+                <svg id="designer-svg-canvas" class="designer-svg-canvas"></svg>
+
+                <!-- Draggable Table Cards Layer -->
+                <div id="designer-cards-layer"></div>
+            </div>
+        </div>
+
+        <!-- Data Preview Drawer -->
+        <div id="designer-preview-drawer" class="designer-preview-drawer">
+            <div class="designer-preview-header">
+                <div class="designer-preview-title" id="designer-preview-title">Pratinjau Data</div>
+                <button type="button" class="designer-btn" style="padding:2px 8px" onclick="window.DB_DESIGNER && window.DB_DESIGNER.closePreview()">✕ Tutup</button>
+            </div>
+            <div class="designer-preview-body" id="designer-preview-body"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Script JS Desainer Skema -->
+<script src="assets/db-designer.js?v=<?php echo @filemtime(__DIR__ . '/assets/db-designer.js'); ?>"></script>
 
 <?php layout_end(); ?>

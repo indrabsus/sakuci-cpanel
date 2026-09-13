@@ -3,17 +3,12 @@
 // Panel tidak menjalankan git sendiri: PHP web di server dimatikan exec()-nya.
 // API hanya membuat baris di job_queue, worker cron yang mengerjakan, dan
 // halaman ini menanyakan hasilnya secara berkala.
-//
-// Kartu diperbarui di tempat, tanpa reload: halaman ini bisa dicapai lewat
-// POST, sehingga memuat ulang akan mengirim ulang form penambahan project.
 
 const POLL_INTERVAL = 2000;
 const POLL_TIMEOUT = 15 * 60 * 1000;
 
 document.addEventListener('click', function (e) {
     const btn = e.target.closest('.git-btn');
-    // Tautan "Buka Web" dan "File" memakai kelas yang sama demi tampilan,
-    // tetapi tidak punya data-action dan harus dibiarkan berperilaku normal.
     if (!btn || !btn.dataset.action) return;
 
     if (btn.dataset.action === 'delete') {
@@ -53,8 +48,6 @@ async function deleteProject(btn) {
         const data = await res.json();
 
         if (data.status === 'deleted') {
-            // Folder bisa gagal dihapus meski baris database sudah hilang;
-            // beri tahu daripada diam-diam meninggalkan sisa di server.
             if (!data.folder_terhapus && data.note) {
                 alert(data.note);
             }
@@ -75,20 +68,37 @@ async function startGitAction(btn) {
     const projectId = card.dataset.project;
     const action = btn.dataset.action;
 
-    if (action === 'pull' && !confirm('Pull akan menimpa perubahan lokal yang belum di-commit di folder project ini. Lanjutkan?')) {
+    let commitMsg = '';
+    if (action === 'pull' && !confirm('Pull akan memperbarui kode dari repositori GitHub. Lanjutkan?')) {
         return;
+    }
+
+    if (action === 'push') {
+        const msg = prompt('Masukkan pesan commit (Commit Message):', 'Update via Sakuci cPanel');
+        if (msg === null) return;
+        commitMsg = msg.trim() || 'Update via Sakuci cPanel';
     }
 
     const ui = cardUi(card);
     ui.busy(true);
-    ui.berjalan(action === 'clone' ? 'Menitipkan clone' : 'Menitipkan pull');
+
+    let label = 'Menitipkan ' + action;
+    if (action === 'clone') label = 'Menitipkan clone';
+    else if (action === 'pull') label = 'Menitipkan pull';
+    else if (action === 'push') label = 'Menitipkan push';
+
+    ui.berjalan(label);
     ui.output('');
 
     try {
-        const data = await request(`api/${action}.php?project_id=${projectId}`, ui);
+        let url = `api/${action}.php?project_id=${projectId}`;
+        if (action === 'push') {
+            url += `&commit_message=${encodeURIComponent(commitMsg)}`;
+        }
+
+        const data = await request(url, ui);
         if (!data) return;
 
-        // Sudah ter-clone: tidak ada pekerjaan yang perlu dipantau.
         if (data.status === 'already_exists') {
             ui.status('ok', data.message);
             markCloned(btn);
@@ -150,12 +160,11 @@ async function pollJob(jobId, btn, ui) {
     ui.busy(false);
 }
 
-/** Mengembalikan JSON, atau null bila sesi berakhir (halaman dialihkan). */
 async function request(url, ui) {
     const res = await fetch(url, { credentials: 'same-origin' });
 
     if (res.status === 401) {
-        ui.status('err', 'Sesi berakhir, mengalihkan ke login…');
+        if (ui) ui.status('err', 'Sesi berakhir, mengalihkan ke login…');
         setTimeout(() => location.href = '../index.php', 1200);
         return null;
     }
@@ -173,9 +182,6 @@ function cardUi(card) {
     const outputEl = card.querySelector('.git-output');
     const buttons = card.querySelectorAll('.git-btn');
 
-    // Penghitung detik berdetak sendiri tiap satu detik, terpisah dari siklus
-    // pemantauan yang dua detik sekali. Tanpa itu tampilan terasa membeku,
-    // terutama saat menunggu giliran worker yang bisa mencapai satu menit.
     let ticker = null;
     let mulai = 0;
     let teksDasar = '';
@@ -191,8 +197,6 @@ function cardUi(card) {
         statusEl.appendChild(putar);
         statusEl.appendChild(document.createTextNode(teksDasar + ' (' + detik + ' detik)'));
 
-        // Antrean dikerjakan cron tiap menit, jadi menunggu sampai 60 detik itu
-        // wajar. Tanpa keterangan ini orang mengira panelnya menggantung.
         if (detik >= 8 && /menunggu/i.test(teksDasar)) {
             const catatan = document.createElement('small');
             catatan.className = 'git-catatan';
@@ -209,7 +213,6 @@ function cardUi(card) {
     };
 
     return {
-        /** Keadaan sedang berjalan: berputar, dengan detik yang terus bertambah. */
         berjalan: (text) => {
             teksDasar = text;
             if (!ticker) {
@@ -218,7 +221,6 @@ function cardUi(card) {
             }
             gambarBerjalan();
         },
-        /** Keadaan selesai: ticker dimatikan, teks statis. */
         status: (kind, text) => {
             hentikanTicker();
             statusEl.className = 'git-status ' + kind;
@@ -238,4 +240,129 @@ function cardUi(card) {
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ---------------- Modal Pengaturan Git & Webhook ---------------- //
+
+let currentGitProject = null;
+
+function openGitSettings(project) {
+    currentGitProject = project;
+    const modal = document.getElementById('settings-modal');
+    if (!modal) return;
+
+    document.getElementById('modal-project-title').textContent = project.name;
+    document.getElementById('modal-project-id').value = project.id;
+    document.getElementById('modal-branch').value = project.branch || 'main';
+
+    const origin = window.location.origin;
+    const webhookUrl = `${origin}/app/api/webhook.php?id=${project.id}&secret=${project.secret}`;
+    document.getElementById('modal-webhook-url').value = webhookUrl;
+    document.getElementById('modal-secret-code').textContent = project.secret;
+
+    const tokenStatus = document.getElementById('modal-token-status');
+    if (project.hasToken) {
+        tokenStatus.innerHTML = '<span class="pill pill-accent" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd">🟢 GitHub PAT Terhubung &mdash; Fitur Push Aktif</span>';
+        document.getElementById('btn-hapus-token').style.display = 'inline-block';
+    } else {
+        tokenStatus.innerHTML = '<span class="pill pill-mute">⚪ GitHub PAT Belum Terhubung (Read-Only)</span>';
+        document.getElementById('btn-hapus-token').style.display = 'none';
+    }
+
+    document.getElementById('modal-token').value = '';
+    modal.style.display = 'flex';
+}
+
+function closeGitSettings() {
+    const modal = document.getElementById('settings-modal');
+    if (modal) modal.style.display = 'none';
+    currentGitProject = null;
+}
+
+function copyWebhookUrl(btn) {
+    const input = document.getElementById('modal-webhook-url');
+    input.select();
+    navigator.clipboard.writeText(input.value).then(() => {
+        const originalText = btn.textContent;
+        btn.textContent = 'Tersalin! ✅';
+        setTimeout(() => btn.textContent = originalText, 2000);
+    });
+}
+
+function copySecret(btn) {
+    const code = document.getElementById('modal-secret-code');
+    navigator.clipboard.writeText(code.textContent).then(() => {
+        const originalText = btn.textContent;
+        btn.textContent = 'Tersalin! ✅';
+        setTimeout(() => btn.textContent = originalText, 2000);
+    });
+}
+
+async function saveGitSettings(e) {
+    e.preventDefault();
+    if (!currentGitProject) return;
+
+    const projectId = document.getElementById('modal-project-id').value;
+    const branch = document.getElementById('modal-branch').value.trim();
+    const token = document.getElementById('modal-token').value.trim();
+    const btnSubmit = document.getElementById('btn-save-settings');
+
+    btnSubmit.disabled = true;
+    btnSubmit.textContent = 'Menyimpan…';
+
+    const formData = new URLSearchParams();
+    formData.append('project_id', projectId);
+    formData.append('git_branch', branch);
+    if (token) {
+        formData.append('github_token', token);
+    }
+
+    try {
+        const res = await fetch('api/update-project.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString()
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            alert('Pengaturan berhasil disimpan!');
+            location.reload();
+        } else {
+            alert('Gagal: ' + (data.error || data.message || 'Terjadi kesalahan'));
+            btnSubmit.disabled = false;
+            btnSubmit.textContent = 'Simpan Pengaturan';
+        }
+    } catch (err) {
+        alert('Gagal menyimpan: ' + err.message);
+        btnSubmit.disabled = false;
+        btnSubmit.textContent = 'Simpan Pengaturan';
+    }
+}
+
+async function removeGitToken() {
+    if (!currentGitProject) return;
+    if (!confirm('Hapus GitHub PAT dari project ini? Fitur Push akan dinonaktifkan.')) return;
+
+    const projectId = currentGitProject.id;
+    const formData = new URLSearchParams();
+    formData.append('project_id', projectId);
+    formData.append('github_token', '');
+
+    try {
+        const res = await fetch('api/update-project.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString()
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            alert('Token berhasil dihapus.');
+            location.reload();
+        }
+    } catch (err) {
+        alert('Gagal: ' + err.message);
+    }
 }

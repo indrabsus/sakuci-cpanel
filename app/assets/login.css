@@ -2,23 +2,21 @@
 
 body.masuk {
     display: flex;
-    /* Kolom, bukan baris: tanpa ini kaki halaman berdiri di samping kotak
-       masuk, bukan di bawahnya. */
     flex-direction: column;
     align-items: center;
     justify-content: center;
     min-height: 100vh;
     padding: 1.5rem;
-    background: var(--sidebar);
+    background: #090e1a;
 }
 
-/* Guratan tipis di latar supaya tidak terasa datar, tetapi tetap tenang. */
+/* Latar biru elegan dengan pendaran cahaya modern */
 body.masuk::before {
     content: "";
     position: fixed; inset: 0;
     background:
-        radial-gradient(60rem 30rem at 15% -10%, rgba(47,111,94,.16), transparent 60%),
-        radial-gradient(45rem 28rem at 95% 105%, rgba(47,111,94,.10), transparent 60%);
+        radial-gradient(60rem 35rem at 15% -10%, rgba(37,99,235,.28), transparent 65%),
+        radial-gradient(50rem 30rem at 95% 105%, rgba(30,64,175,.22), transparent 65%);
     pointer-events: none;
 }
 

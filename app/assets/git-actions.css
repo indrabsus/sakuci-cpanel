@@ -26,6 +26,51 @@
 .proyek-d dd a { color: var(--accent); text-decoration: none; font-weight: 500; }
 .proyek-d dd a:hover { text-decoration: underline; }
 
+.proyek-commit {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    flex-wrap: wrap;
+    max-width: 100%;
+}
+.commit-hash-link {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    font-family: var(--mono);
+    font-size: .78rem;
+    font-weight: 600;
+    padding: .12rem .45rem;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    text-decoration: none;
+    line-height: 1.35;
+    transition: all .15s ease;
+}
+.commit-hash-link:hover {
+    background: #e0e7ff;
+    color: var(--accent);
+    border-color: #c7d2fe;
+    text-decoration: none;
+}
+.commit-msg {
+    color: var(--ink-2);
+    font-weight: 500;
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+    vertical-align: middle;
+}
+.commit-meta {
+    font-size: .76rem;
+    color: var(--ink-3);
+    white-space: nowrap;
+}
+
 /* ---------- Baris tombol ---------- */
 
 .git-actions { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; }
@@ -101,3 +146,81 @@
     max-height: 200px;
 }
 .git-output.show { display: block; }
+
+/* Tombol Push & Webhook */
+.git-btn-push {
+    background: #059669 !important;
+    border-color: #059669 !important;
+    color: #ffffff !important;
+}
+.git-btn-push:hover:not(:disabled) {
+    background: #047857 !important;
+    border-color: #047857 !important;
+}
+
+.git-btn-webhook {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+    color: #166534;
+}
+.git-btn-webhook:hover:not(:disabled) {
+    background: #dcfce7;
+    border-color: #86efac;
+}
+
+/* Modal Overlay & Card */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(11, 19, 41, 0.7);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    animation: fadeIn .15s ease-out;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
+    width: 100%;
+    max-width: 620px;
+    max-height: 90vh;
+    overflow-y: auto;
+    color: var(--ink);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.1rem 1.4rem;
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.6rem;
+    line-height: 1;
+    color: var(--ink-3);
+    cursor: pointer;
+    padding: 0 .2rem;
+    transition: color .12s;
+}
+.modal-close:hover {
+    color: var(--ink);
+}
+
+.modal-body {
+    padding: 1.3rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}

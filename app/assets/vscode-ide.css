@@ -1,0 +1,1245 @@
+/* ==========================================================================
+   VS Code Web IDE Theme & Layout - Sakuci cPanel
+   100% Fullscreen, Standalone, Mobile Optimized, & Git Management
+   ========================================================================== */
+
+:root {
+    --vsc-bg-darkest: #141414;
+    --vsc-bg-sidebar: #181818;
+    --vsc-bg-dark: #1e1e1e;
+    --vsc-bg-tab: #252526;
+    --vsc-bg-tab-inactive: #2d2d2d;
+    --vsc-bg-hover: #2a2d2e;
+    --vsc-bg-selected: #04395e;
+    --vsc-blue: #007acc;
+    --vsc-blue-hover: #0098ff;
+    --vsc-green: #059669;
+    --vsc-green-hover: #047857;
+    --vsc-warn: #eab308;
+    --vsc-danger: #ef4444;
+    --vsc-text-main: #cccccc;
+    --vsc-text-bright: #ffffff;
+    --vsc-text-dim: #858585;
+    --vsc-border: #2b2b2b;
+    --vsc-border-light: #383838;
+    --vsc-font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+/* Reset total: halaman berkas menjadi 100% fullscreen */
+html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+    background: var(--vsc-bg-dark) !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--vsc-text-main);
+}
+
+.vscode-workspace {
+    display: flex;
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
+    background: var(--vsc-bg-dark);
+    overflow: hidden;
+    user-select: none;
+}
+
+/* ---------------- Top Menubar / Toolbar ---------------- */
+.vsc-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 44px;
+    background: var(--vsc-bg-darkest);
+    border-bottom: 1px solid var(--vsc-border);
+    padding: 0 12px;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.vsc-topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.vsc-btn-back {
+    background: #2563eb !important;
+    border-color: #2563eb !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}
+.vsc-btn-back:hover {
+    background: #1d4ed8 !important;
+}
+
+.vsc-project-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--vsc-blue-hover);
+    background: rgba(0, 122, 204, 0.15);
+    border: 1px solid rgba(0, 122, 204, 0.35);
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+/* View Switcher Tabs (Berkas vs Editor vs Git) */
+.vsc-view-tabs {
+    display: flex;
+    align-items: center;
+    background: #222222;
+    border: 1px solid var(--vsc-border-light);
+    border-radius: 6px;
+    padding: 2px;
+    gap: 2px;
+}
+
+.vsc-view-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 550;
+    color: var(--vsc-text-dim);
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    white-space: nowrap;
+}
+.vsc-view-tab:hover {
+    color: var(--vsc-text-bright);
+}
+.vsc-view-tab.active {
+    background: var(--vsc-blue);
+    color: #ffffff;
+}
+
+.vsc-git-badge-counter {
+    background: var(--vsc-warn);
+    color: #000;
+    font-weight: 700;
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 10px;
+    line-height: 1.2;
+    display: none;
+}
+.vsc-git-badge-counter.show {
+    display: inline-block;
+}
+
+.vsc-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.vsc-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 550;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.12s ease;
+    line-height: 1.4;
+    color: var(--vsc-text-bright);
+    background: #333333;
+}
+.vsc-btn:hover {
+    background: #444444;
+}
+
+.vsc-btn-save {
+    background: var(--vsc-blue);
+}
+.vsc-btn-save:hover {
+    background: var(--vsc-blue-hover);
+}
+
+.vsc-btn-push {
+    background: var(--vsc-green);
+}
+.vsc-btn-push:hover {
+    background: var(--vsc-green-hover);
+}
+
+.vsc-btn-cli {
+    background: #312e81 !important;
+    border-color: #4338ca !important;
+    color: #e0e7ff !important;
+    font-weight: 600 !important;
+}
+.vsc-btn-cli:hover {
+    background: #3730a3 !important;
+    border-color: #6366f1 !important;
+    color: #ffffff !important;
+}
+
+/* ---------------- Main Body: Explorer + Editor + Git ---------------- */
+.vsc-main {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Activity Bar (Sisi Kiri Paling Sempit) */
+.vsc-activity-bar {
+    width: 46px;
+    background: var(--vsc-bg-darkest);
+    border-right: 1px solid var(--vsc-border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 0;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.vsc-act-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+    color: var(--vsc-text-dim);
+    cursor: pointer;
+    transition: all 0.12s;
+    text-decoration: none;
+    position: relative;
+}
+.vsc-act-btn svg {
+    width: 19px;
+    height: 19px;
+}
+.vsc-act-btn:hover {
+    color: var(--vsc-text-bright);
+    background: rgba(255, 255, 255, 0.08);
+}
+.vsc-act-btn.active {
+    color: var(--vsc-text-bright);
+    border-left: 2px solid var(--vsc-blue);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Lencana dot pada icon git activity bar */
+.vsc-act-dot {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--vsc-warn);
+    display: none;
+}
+.vsc-act-dot.show {
+    display: block;
+}
+
+/* Sidebar / File Explorer */
+.vsc-sidebar {
+    width: 260px;
+    min-width: 180px;
+    max-width: 500px;
+    background: var(--vsc-bg-sidebar);
+    border-right: 1px solid var(--vsc-border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    user-select: none;
+    transition: width 0.15s ease;
+}
+
+.vsc-sidebar.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    display: none !important;
+}
+
+.vsc-sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #999;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.vsc-sidebar-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.vsc-icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--vsc-text-dim);
+    cursor: pointer;
+    padding: 3px 6px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+}
+.vsc-icon-btn:hover {
+    color: var(--vsc-text-bright);
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* File Tree */
+.vsc-tree-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 0;
+}
+
+.vsc-tree-item {
+    display: flex;
+    align-items: center;
+    height: 28px;
+    padding-right: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--vsc-text-main);
+    transition: background 0.08s;
+    white-space: nowrap;
+    position: relative;
+}
+.vsc-tree-item:hover {
+    background: var(--vsc-bg-hover);
+}
+.vsc-tree-item.active {
+    background: var(--vsc-bg-selected);
+    color: var(--vsc-text-bright);
+}
+
+.vsc-tree-arrow {
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #888;
+    flex-shrink: 0;
+    transition: transform 0.12s;
+}
+.vsc-tree-arrow.open {
+    transform: rotate(90deg);
+}
+
+.vsc-file-icon {
+    width: 18px;
+    height: 18px;
+    margin-right: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.icon-php { color: #8892be; }
+.icon-js { color: #f7df1e; }
+.icon-css { color: #42a5f5; }
+.icon-html { color: #e44d26; }
+.icon-json { color: #cbcb41; }
+.icon-env { color: #10b981; font-weight: bold; }
+.icon-sql { color: #00acc1; }
+.icon-md { color: #519aba; }
+.icon-folder { color: #dcb67a; }
+.icon-file { color: #858585; }
+
+.vsc-tree-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Lencana Perubahan Git pada File Tree (M, U, D) */
+.git-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 3px;
+    margin-left: 6px;
+    margin-right: 4px;
+    line-height: 1.2;
+    flex-shrink: 0;
+}
+.git-badge-m {
+    color: #e2c08d;
+    background: rgba(226, 192, 141, 0.15);
+}
+.git-badge-u, .git-badge-a {
+    color: #73c991;
+    background: rgba(115, 201, 145, 0.15);
+}
+.git-badge-d {
+    color: #e06c75;
+    background: rgba(224, 108, 117, 0.15);
+}
+
+.vsc-tree-item.git-modified .vsc-tree-name {
+    color: #e2c08d;
+}
+.vsc-tree-item.git-untracked .vsc-tree-name,
+.vsc-tree-item.git-added .vsc-tree-name {
+    color: #73c991;
+}
+.vsc-tree-item.git-deleted .vsc-tree-name {
+    color: #e06c75;
+    text-decoration: line-through;
+}
+
+.vsc-item-actions {
+    display: none;
+    align-items: center;
+    gap: 2px;
+}
+.vsc-tree-item:hover .vsc-item-actions {
+    display: flex;
+}
+
+/* Resizer Handle */
+.vsc-resizer {
+    width: 4px;
+    background: var(--vsc-border);
+    cursor: col-resize;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+.vsc-resizer:hover, .vsc-resizer.dragging {
+    background: var(--vsc-blue);
+}
+
+/* ---------------- Editor Workspace ---------------- */
+.vsc-editor-area {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--vsc-bg-dark);
+}
+
+/* Tabs Bar */
+.vsc-tabs-bar {
+    display: flex;
+    height: 36px;
+    background: var(--vsc-bg-tab);
+    border-bottom: 1px solid var(--vsc-bg-darkest);
+    overflow-x: auto;
+    overflow-y: hidden;
+    user-select: none;
+    scrollbar-width: thin;
+}
+
+.vsc-tab {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 12px;
+    height: 100%;
+    font-size: 12.5px;
+    color: var(--vsc-text-dim);
+    background: var(--vsc-bg-tab-inactive);
+    border-right: 1px solid var(--vsc-bg-darkest);
+    cursor: pointer;
+    white-space: nowrap;
+    position: relative;
+    border-top: 2px solid transparent;
+}
+.vsc-tab:hover {
+    background: #333333;
+    color: var(--vsc-text-main);
+}
+.vsc-tab.active {
+    background: var(--vsc-bg-dark);
+    color: var(--vsc-text-bright);
+    border-top: 2px solid var(--vsc-blue);
+}
+
+.vsc-tab.git-modified {
+    color: #e2c08d;
+}
+.vsc-tab.git-untracked {
+    color: #73c991;
+}
+
+.vsc-tab-dirty {
+    display: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--vsc-text-bright);
+    margin-left: 2px;
+}
+.vsc-tab.dirty .vsc-tab-dirty {
+    display: inline-block;
+}
+.vsc-tab.dirty .vsc-tab-close {
+    display: none;
+}
+.vsc-tab.dirty:hover .vsc-tab-dirty {
+    display: none;
+}
+.vsc-tab.dirty:hover .vsc-tab-close {
+    display: inline-flex;
+}
+
+.vsc-tab-close {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: var(--vsc-text-dim);
+    cursor: pointer;
+}
+.vsc-tab-close:hover {
+    background: rgba(255, 255, 255, 0.18);
+    color: var(--vsc-text-bright);
+}
+
+/* Breadcrumb Sub-bar & Subbar Actions */
+.vsc-subbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 28px;
+    padding: 0 10px;
+    background: var(--vsc-bg-dark);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 11.5px;
+    color: var(--vsc-text-dim);
+    font-family: var(--vsc-font-mono);
+}
+
+.vsc-breadcrumb {
+    display: flex;
+    align-items: center;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+    flex: 1;
+    min-width: 0;
+    margin-right: 8px;
+}
+.vsc-breadcrumb::-webkit-scrollbar {
+    display: none;
+}
+
+.vsc-breadcrumb-sep {
+    color: #555;
+    margin: 0 4px;
+}
+.vsc-breadcrumb-file {
+    color: var(--vsc-text-bright);
+    font-weight: 550;
+}
+
+.vsc-subbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.vsc-subbar-tool-btn {
+    display: none;
+    align-items: center;
+    gap: 3px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--vsc-text-main);
+    border: 1px solid var(--vsc-border-subtle);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    line-height: 1.4;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+.vsc-subbar-tool-btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.25);
+}
+.vsc-subbar-tool-btn:active {
+    background: rgba(255, 255, 255, 0.22);
+    transform: scale(0.96);
+}
+.vsc-subbar-tool-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.vsc-subbar-save-btn {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    background: var(--vsc-blue);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    line-height: 1.4;
+    transition: all 0.15s ease;
+}
+.vsc-subbar-save-btn:hover {
+    background: var(--vsc-blue-hover);
+}
+.vsc-subbar-save-btn.is-dirty {
+    background: #d97706;
+    border-color: #f59e0b;
+}
+.vsc-subbar-save-btn.is-saved {
+    background: #059669;
+    border-color: #10b981;
+}
+
+/* Floating Save Action Button (FAB) */
+.vsc-mobile-fab-save {
+    display: none;
+}
+
+/* Banner Informasi Read-Only */
+.vsc-readonly-banner {
+    display: none;
+    background: #2d230d;
+    border-bottom: 1px solid #66501a;
+    color: #fbd38d;
+    padding: 7px 14px;
+    font-size: 12px;
+    line-height: 1.4;
+    align-items: center;
+    justify-content: space-between;
+}
+.vsc-readonly-banner.show {
+    display: flex;
+}
+
+/* Wadah Monaco Editor */
+.vsc-monaco-wrap {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    position: relative;
+    background: var(--vsc-bg-dark);
+}
+
+#monaco-container {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+/* Halaman Kosong (No Open Files) */
+.vsc-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--vsc-text-dim);
+    gap: 16px;
+    user-select: none;
+}
+
+.vsc-empty-logo {
+    width: 64px;
+    height: 64px;
+    opacity: 0.35;
+}
+
+.vsc-shortcuts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12.5px;
+}
+.vsc-shortcut-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.vsc-key {
+    background: #2d2d2d;
+    border: 1px solid #404040;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: var(--vsc-font-mono);
+    color: var(--vsc-text-bright);
+}
+
+/* ---------------- Git & Source Control View ---------------- */
+.vsc-git-view {
+    display: none;
+    flex: 1;
+    min-height: 0;
+    background: var(--vsc-bg-dark);
+    flex-direction: column;
+    overflow-y: auto;
+    padding: 16px 20px;
+    gap: 20px;
+}
+
+.vsc-git-panel {
+    background: var(--vsc-bg-sidebar);
+    border: 1px solid var(--vsc-border-light);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.vsc-git-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid var(--vsc-border);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--vsc-text-bright);
+}
+
+.vsc-git-panel-body {
+    padding: 12px 14px;
+}
+
+/* Daftar Perubahan File di Git Tab */
+.vsc-git-file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.vsc-git-file-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    background: var(--vsc-bg-dark);
+    border: 1px solid var(--vsc-border);
+    border-radius: 5px;
+    font-size: 12.5px;
+    transition: background 0.1s;
+}
+.vsc-git-file-row:hover {
+    background: var(--vsc-bg-hover);
+}
+
+.vsc-git-file-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    flex: 1;
+    overflow: hidden;
+}
+
+.vsc-git-file-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Riwayat Commit */
+.vsc-commit-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vsc-commit-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--vsc-bg-dark);
+    border: 1px solid var(--vsc-border);
+    border-radius: 6px;
+    gap: 12px;
+}
+
+.vsc-commit-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+    min-width: 0;
+}
+
+.vsc-commit-msg {
+    font-size: 13px;
+    font-weight: 550;
+    color: var(--vsc-text-bright);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vsc-commit-meta {
+    font-size: 11.5px;
+    color: var(--vsc-text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vsc-commit-hash {
+    font-family: var(--vsc-font-mono);
+    color: var(--vsc-blue-hover);
+    background: rgba(0, 122, 204, 0.15);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-weight: 600;
+}
+
+.vsc-btn-rollback {
+    background: #991b1b !important;
+    border-color: #b91c1c !important;
+    color: #ffffff !important;
+    font-size: 11px !important;
+    padding: 4px 8px !important;
+    white-space: nowrap;
+}
+.vsc-btn-rollback:hover {
+    background: #b91c1c !important;
+}
+
+/* ---------------- Bottom Status Bar ---------------- */
+.vsc-statusbar {
+    height: 25px;
+    background: var(--vsc-blue);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    font-size: 11.5px;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.vsc-status-left, .vsc-status-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.vsc-status-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: default;
+}
+
+.vsc-status-btn {
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    font-size: 11.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.vsc-status-btn:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+/* Spinner */
+.vsc-spin {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: vscSpin 0.7s linear infinite;
+}
+@keyframes vscSpin { to { transform: rotate(360deg); } }
+
+/* ==========================================================================
+   MODE TAMPILAN (EXPLORER, EDITOR, GIT)
+   ========================================================================== */
+
+/* Mode Git */
+.vscode-workspace.mode-git .vsc-sidebar {
+    display: none !important;
+}
+.vscode-workspace.mode-git .vsc-resizer {
+    display: none !important;
+}
+.vscode-workspace.mode-git .vsc-editor-area {
+    display: none !important;
+}
+.vscode-workspace.mode-git .vsc-git-view {
+    display: flex !important;
+}
+
+/* ---------------- Sakuci CLI Modal & Terminal ---------------- */
+.vsc-cli-modal-card {
+    max-width: 580px !important;
+    width: 95vw !important;
+    background: #18181b !important;
+    border: 1px solid #27272a !important;
+}
+
+.vsc-cli-tabs {
+    display: flex;
+    gap: 4px;
+    background: #27272a;
+    padding: 3px;
+    border-radius: 6px;
+    margin-bottom: 14px;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: thin;
+}
+
+.vsc-cli-tab {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 550;
+    color: #a1a1aa;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    white-space: nowrap;
+}
+.vsc-cli-tab:hover {
+    color: #ffffff;
+}
+.vsc-cli-tab.active {
+    background: #3f3f46;
+    color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.vsc-cli-tab-danger {
+    color: #f87171 !important;
+}
+.vsc-cli-tab-danger.active {
+    background: #991b1b !important;
+    color: #ffffff !important;
+}
+
+.vsc-cli-input {
+    width: 100%;
+    padding: 8px 12px;
+    background: #09090b;
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+    box-sizing: border-box;
+}
+.vsc-cli-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.vsc-cli-danger-card {
+    background: rgba(220, 38, 38, 0.1);
+    border: 1px solid rgba(220, 38, 38, 0.35);
+    border-radius: 6px;
+    padding: 10px 14px;
+}
+
+.vsc-cli-terminal {
+    background: #09090b;
+    border: 1px solid #27272a;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-family: var(--vsc-font-mono);
+    font-size: 12px;
+    color: #e4e4e7;
+    max-height: 220px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+}
+
+/* ==========================================================================
+   OPTIMASI KHUSUS MOBILE (SMARTPHONE / HP)
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    .hide-mobile {
+        display: none !important;
+    }
+
+    .vsc-project-tag {
+        display: none !important;
+    }
+
+    .vsc-btn-back-text {
+        display: none !important;
+    }
+
+    .vsc-activity-bar {
+        display: none !important;
+    }
+
+    .vsc-resizer {
+        display: none !important;
+    }
+
+    /* Topbar Layout di Layar HP: Rapi, Pas di 320px - 400px tanpa terpotong */
+    .vsc-topbar {
+        padding: 0 6px !important;
+        gap: 4px !important;
+        height: 44px !important;
+        overflow: hidden !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+    }
+
+    .vsc-topbar-left {
+        flex-shrink: 0 !important;
+        gap: 4px !important;
+    }
+
+    .vsc-btn-back {
+        padding: 6px 8px !important;
+        min-width: 32px !important;
+        justify-content: center !important;
+    }
+
+    /* Tab Switcher antara Berkas, Editor & Git */
+    .vsc-view-tabs {
+        flex: 0 1 auto !important;
+        min-width: 0 !important;
+        padding: 2px !important;
+        gap: 1px !important;
+        overflow: hidden !important;
+    }
+
+    .vsc-view-tab {
+        padding: 4px 7px !important;
+        font-size: 11px !important;
+        gap: 3px !important;
+    }
+
+    /* Sembunyikan teks nama file pada tombol tab Editor di HP agar tidak makan tempat */
+    #view-tab-filename {
+        display: none !important;
+    }
+
+    /* Sisi Kanan: HARUS SELALU MUNCUL DI LAYAR HP (FLEX-SHRINK: 0) */
+    .vsc-topbar-right {
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        flex-shrink: 0 !important;
+        margin-left: auto !important;
+    }
+
+    /* Tombol Simpan di Topbar HP: TEBAL, MENCOLOK, TEKS "SIMPAN" TETAP TERLIHAT */
+    .vsc-btn-save {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        background: var(--vsc-blue) !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        font-size: 12px !important;
+        padding: 5px 9px !important;
+        border-radius: 4px !important;
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+    }
+    .vsc-btn-save .vsc-save-label {
+        display: inline !important;
+    }
+    .vsc-btn-save.is-dirty {
+        background: #d97706 !important;
+        box-shadow: 0 0 8px rgba(217, 119, 6, 0.6) !important;
+    }
+    .vsc-btn-save.is-saved {
+        background: #059669 !important;
+        box-shadow: 0 0 8px rgba(5, 150, 105, 0.6) !important;
+    }
+
+    .vsc-btn-cli, .vsc-btn-push, .vsc-topbar-right a.vsc-btn {
+        padding: 5px 8px !important;
+        font-size: 12px !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* Subbar di Layar HP */
+    .vsc-subbar {
+        height: 30px !important;
+        padding: 0 8px !important;
+    }
+    .vsc-subbar-actions {
+        gap: 3px !important;
+    }
+    .vsc-subbar-save-btn {
+        padding: 3px 8px !important;
+        font-size: 11.5px !important;
+    }
+    .vsc-subbar-tool-btn {
+        padding: 3px 6px !important;
+        font-size: 11.5px !important;
+    }
+    .vsc-subbar-tool-btn .vsc-subbar-btn-text {
+        display: none !important;
+    }
+
+    /* Floating Action Button (FAB) Simpan Khusus di HP saat Mode Editor */
+    .vscode-workspace.mode-editor .vsc-mobile-fab-save.show {
+        display: flex !important;
+        align-items: center;
+        gap: 6px;
+        position: fixed;
+        right: 14px;
+        bottom: 34px; /* Tepat di atas bottom statusbar */
+        z-index: 999;
+        background: linear-gradient(135deg, #007acc, #0284c7);
+        color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        padding: 8px 16px;
+        border-radius: 24px;
+        font-size: 13px;
+        font-weight: 600;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 122, 204, 0.4);
+        cursor: pointer;
+        user-select: none;
+        transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    }
+    .vscode-workspace.mode-editor .vsc-mobile-fab-save.show:active {
+        transform: scale(0.95);
+    }
+    .vscode-workspace.mode-editor .vsc-mobile-fab-save.is-dirty {
+        background: linear-gradient(135deg, #d97706, #f59e0b) !important;
+        box-shadow: 0 4px 14px rgba(217, 119, 6, 0.5) !important;
+        animation: vscFabPulse 1.5s infinite;
+    }
+    .vscode-workspace.mode-editor .vsc-mobile-fab-save.is-saved {
+        background: linear-gradient(135deg, #059669, #10b981) !important;
+    }
+
+    /* Mode Tampilan Tab di HP */
+    .vscode-workspace.mode-explorer .vsc-sidebar {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        min-width: 100vw !important;
+        display: flex !important;
+    }
+    .vscode-workspace.mode-explorer .vsc-editor-area {
+        display: none !important;
+    }
+    .vscode-workspace.mode-explorer .vsc-git-view {
+        display: none !important;
+    }
+
+    .vscode-workspace.mode-editor .vsc-sidebar {
+        display: none !important;
+    }
+    .vscode-workspace.mode-editor .vsc-editor-area {
+        width: 100vw !important;
+        display: flex !important;
+    }
+    .vscode-workspace.mode-editor .vsc-git-view {
+        display: none !important;
+    }
+
+    .vscode-workspace.mode-git .vsc-git-view {
+        width: 100vw !important;
+        padding: 12px;
+    }
+
+    /* Target sentuhan lebih nyaman di jari */
+    .vsc-tree-item {
+        height: 38px;
+        font-size: 14px;
+    }
+    .vsc-item-actions {
+        display: flex !important;
+    }
+    .vsc-icon-btn {
+        padding: 6px 8px;
+        font-size: 14px;
+    }
+
+    .vsc-tab {
+        padding: 0 14px;
+        font-size: 13px;
+    }
+
+    .vsc-commit-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    .vsc-btn-rollback {
+        align-self: flex-end;
+    }
+
+    .vsc-status-right span:not(#vsc-status-lang) {
+        display: none;
+    }
+}
+
+@keyframes vscFabPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}

@@ -28,7 +28,7 @@ return [
     // pembatasan (dipakai saat pengembangan lokal).
     //
     // Menerima alamat persis maupun rentang CIDR, IPv4 dan IPv6:
-    //     '103.158.96.27'        satu alamat
+    //     '103.158.96.244'        satu alamat
     //     '103.158.96.0/24'      satu rentang
     //     '2404:c0:ab00::/48'    rentang IPv6
     //
@@ -56,5 +56,5 @@ return [
 
     // Alamat phpMyAdmin. Di aaPanel biasanya di port 888 dengan nama folder
     // acak; lihat aaPanel -> Database -> phpMyAdmin untuk alamat pastinya.
-    'phpmyadmin_url' => 'http://103.158.96.27:888/phpmyadmin_XXXXXXXX/',
+    'phpmyadmin_url' => 'http://103.158.96.244:888/phpmyadmin_XXXXXXXX/',
 ];

@@ -50,3 +50,7 @@ cookies.txt
 # Testing
 .phpunit.result.cache
 coverage/
+
+# Server specifics
+.user.ini
+.well-known/

@@ -207,8 +207,24 @@ layout_start('Pengguna', 'Kelola akun siswa dan administrator', 'users', $me);
                             <?php echo $u['role'] === 'admin' ? 'Admin' : 'Siswa'; ?>
                         </span>
                     </td>
-                    <td class="num"><?php echo (int) $u['n_project']; ?></td>
-                    <td class="num"><?php echo (int) $u['n_db']; ?></td>
+                    <td class="num">
+                        <?php if ($u['role'] === 'admin'): ?>
+                            <span class="dim">&mdash;</span>
+                        <?php else: ?>
+                            <span class="pill <?php echo (int)$u['n_project'] >= 1 ? 'pill-warn' : 'pill-mute'; ?>" style="<?php echo (int)$u['n_project'] >= 1 ? 'background:#fef3c7; color:#92400e; font-weight:600' : ''; ?>">
+                                <?php echo (int) $u['n_project']; ?> / 1
+                            </span>
+                        <?php endif; ?>
+                    </td>
+                    <td class="num">
+                        <?php if ($u['role'] === 'admin'): ?>
+                            <span class="dim">&mdash;</span>
+                        <?php else: ?>
+                            <span class="pill <?php echo (int)$u['n_db'] >= 1 ? 'pill-warn' : 'pill-mute'; ?>" style="<?php echo (int)$u['n_db'] >= 1 ? 'background:#fef3c7; color:#92400e; font-weight:600' : ''; ?>">
+                                <?php echo (int) $u['n_db']; ?> / 1
+                            </span>
+                        <?php endif; ?>
+                    </td>
                     <td class="num dim"><?php echo date('d M Y', strtotime($u['created_at'])); ?></td>
                     <td class="num">
                         <form method="POST" style="display:inline"

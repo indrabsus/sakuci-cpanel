@@ -67,9 +67,6 @@ $v = fn(string $f) => $f . '?v=' . @filemtime(__DIR__ . '/app/assets/' . $f);
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Masuk &middot; Sakuci cPanel</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;550;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app/assets/<?php echo $v('panel.css'); ?>">
 <link rel="stylesheet" href="app/assets/<?php echo $v('login.css'); ?>">
 </head>

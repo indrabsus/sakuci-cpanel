@@ -1,36 +1,57 @@
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('fonts/inter-400.ttf') format('truetype');
+}
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('fonts/inter-500.ttf') format('truetype');
+}
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('fonts/inter-600.ttf') format('truetype');
+}
+
 /* Sistem tampilan Sakuci cPanel.
    Satu berkas untuk semua halaman -- sebelumnya tiap halaman membawa <style>
    sendiri, dan itulah sebab tampilannya tidak pernah terasa satu kesatuan. */
 
 :root {
-    /* Netral sebagai dasar. Warna hanya dipakai untuk hal yang benar-benar
-       perlu perhatian, sehingga yang berwarna berarti penting. */
-    --bg:        #f6f7f9;
+    /* Tema Elegan Clean & Latar Biru Modern */
+    --bg:        #f8fafc;
     --surface:   #ffffff;
-    --sidebar:   #14171f;
-    --sidebar-2: #1c212c;
+    --sidebar:   #0b1329;   /* Deep Midnight Blue */
+    --sidebar-2: #162447;   /* Navy slate untuk hover & active */
 
-    --line:      #e4e7ec;
-    --line-soft: #f0f2f5;
+    --line:      #e2e8f0;
+    --line-soft: #f1f5f9;
 
-    --ink:       #14171f;
-    --ink-2:     #5a6172;
-    --ink-3:     #98a0b3;
-    --ink-inv:   #f6f7f9;
+    --ink:       #0f172a;
+    --ink-2:     #475569;
+    --ink-3:     #94a3b8;
+    --ink-inv:   #f8fafc;
 
-    --accent:    #2f6f5e;   /* hijau tua: tenang, tidak seperti biru template */
-    --accent-2:  #245646;
-    --accent-bg: #edf5f2;
+    --accent:    #2563eb;   /* Biru Elegan Royal Blue */
+    --accent-2:  #1d4ed8;   /* Biru Hover */
+    --accent-bg: #eff6ff;   /* Latar Biru Lembut */
 
-    --danger:    #a5342c;
-    --danger-bg: #fdf1f0;
-    --warn:      #8a5a12;
-    --warn-bg:   #fdf6ea;
+    --danger:    #dc2626;
+    --danger-bg: #fef2f2;
+    --warn:      #d97706;
+    --warn-bg:   #fffbeb;
 
-    --r:   6px;
-    --r-l: 10px;
+    --r:   8px;
+    --r-l: 12px;
 
-    --shadow: 0 1px 2px rgba(20,23,31,.05), 0 1px 3px rgba(20,23,31,.04);
+    --shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -210,7 +231,7 @@ input[type=file] { font-size: .8rem; }
     margin-bottom: 1.15rem;
     font-size: .86rem;
 }
-.note-ok   { background: var(--accent-bg); border-color: #bfd9d0; color: #1f4d40; }
+.note-ok   { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
 .note-err  { background: var(--danger-bg); border-color: #eecac6; color: #7d281f; }
 .note-warn { background: var(--warn-bg);   border-color: #ecd9b0; color: #6d4710; }
 .note code { background: rgba(255,255,255,.65); padding: .1rem .35rem; border-radius: 3px; }

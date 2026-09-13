@@ -82,6 +82,13 @@ function list_directory(string $dir): array
     return $items;
 }
 
+/** Memeriksa apakah berkas merupakan berkas konfigurasi .env */
+function is_env_file(string $filename): bool
+{
+    $base = basename($filename);
+    return $base === '.env' || str_starts_with($base, '.env.');
+}
+
 /** Menebak apakah berkas layak ditampilkan di editor teks. */
 function is_editable(string $path): bool
 {

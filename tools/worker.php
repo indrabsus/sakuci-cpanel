@@ -81,6 +81,18 @@ $isWindows = DIRECTORY_SEPARATOR === '\\';
 putenv('GIT_TERMINAL_PROMPT=0');
 putenv('GIT_ASKPASS=' . ($isWindows ? 'cmd /c exit' : '/bin/true'));
 
+function get_auth_git_url(string $url, ?string $token): string
+{
+    if (!$token) {
+        return $url;
+    }
+    // Sisipkan token ke URL GitHub: https://oauth2:TOKEN@github.com/user/repo
+    if (preg_match('#^https?://([^@]+@)?github\.com/(.+)$#i', $url, $m)) {
+        return 'https://oauth2:' . urlencode($token) . '@github.com/' . $m[2];
+    }
+    return $url;
+}
+
 function git(string $args, ?string $cwd = null): array
 {
     global $isWindows;
@@ -95,7 +107,7 @@ function git(string $args, ?string $cwd = null): array
     // saat pengembangan lokal.
     $cmd .= $isWindows ? '' : 'timeout ' . JOB_TIMEOUT . ' ';
 
-    return run($cmd . 'git ' . $args . ' 2>&1');
+    return run($cmd . 'git -c safe.directory=* ' . $args . ' 2>&1');
 }
 
 function finish($conn, int $id, string $status, string $output): void
@@ -136,8 +148,10 @@ while ($processed < MAX_PER_RUN) {
     $processed++;
 
     $stmt = $conn->prepare(
-        "SELECT j.action, p.git_url, p.git_branch, p.local_path
-           FROM job_queue j JOIN projects p ON p.id = j.project_id
+        "SELECT j.action, j.commit_message, p.git_url, p.git_branch, p.local_path, p.github_token, u.username
+           FROM job_queue j
+           JOIN projects p ON p.id = j.project_id
+           JOIN users u ON u.id = j.user_id
           WHERE j.id = ?"
     );
     $stmt->bind_param("i", $id);
@@ -165,9 +179,10 @@ while ($processed < MAX_PER_RUN) {
         // dibereskan siswa.
         $sementara = $path . '.tmp-' . bin2hex(random_bytes(4));
 
+        $authCloneUrl = get_auth_git_url($job['git_url'], $job['github_token']);
         [$out, $code] = git(
             'clone --branch ' . escapeshellarg($branch)
-            . ' ' . escapeshellarg($job['git_url'])
+            . ' ' . escapeshellarg($authCloneUrl)
             . ' ' . escapeshellarg($sementara),
             $parent
         );
@@ -192,10 +207,14 @@ while ($processed < MAX_PER_RUN) {
         if ($code !== 0) {
             delete_recursive_worker($sementara);
         }
-    } else {
+    } elseif ($job['action'] === 'pull') {
         if (!is_dir($path . '/.git')) {
             finish($conn, $id, 'failed', "Bukan repo git: $path");
             continue;
+        }
+
+        if (!empty($job['github_token'])) {
+            git('remote set-url origin ' . escapeshellarg(get_auth_git_url($job['git_url'], $job['github_token'])), $path);
         }
 
         [$fetchOut, $code] = git('fetch origin', $path);
@@ -208,6 +227,55 @@ while ($processed < MAX_PER_RUN) {
             );
             $out = trim($fetchOut . "\n" . $resetOut);
         }
+
+        if (!empty($job['github_token'])) {
+            git('remote set-url origin ' . escapeshellarg($job['git_url']), $path);
+        }
+    } elseif ($job['action'] === 'push') {
+        if (!is_dir($path . '/.git')) {
+            finish($conn, $id, 'failed', "Bukan repo git: $path");
+            continue;
+        }
+
+        if (empty($job['github_token'])) {
+            finish($conn, $id, 'failed', "Fitur Push membutuhkan GitHub Personal Access Token (PAT). Silakan masukkan token di form project.");
+            continue;
+        }
+
+        $authUrl = get_auth_git_url($job['git_url'], $job['github_token']);
+        $authorName = $job['username'] ?: 'Sakuci User';
+        $authorEmail = ($job['username'] ?: 'user') . '@sakuci.id';
+        $commitMsg = trim($job['commit_message'] ?: 'Update kodingan via Sakuci cPanel');
+
+        // Gunakan remote dengan otentikasi token
+        git('remote set-url origin ' . escapeshellarg($authUrl), $path);
+        git('config user.name ' . escapeshellarg($authorName), $path);
+        git('config user.email ' . escapeshellarg($authorEmail), $path);
+
+        // Tambahkan semua file yang berubah
+        git('add -A', $path);
+
+        // Periksa apakah ada perubahan
+        [$statusOut, $statusCode] = git('status --porcelain', $path);
+        if ($statusCode === 0 && empty(trim($statusOut))) {
+            git('remote set-url origin ' . escapeshellarg($job['git_url']), $path);
+            finish($conn, $id, 'success', 'Tidak ada perubahan file untuk di-commit.');
+            continue;
+        }
+
+        // Commit perubahan
+        [$commitOut, $code] = git('commit -m ' . escapeshellarg($commitMsg), $path);
+
+        if ($code === 0) {
+            // Push ke remote GitHub
+            [$pushOut, $code] = git('push origin ' . escapeshellarg($branch), $path);
+            $out = trim($commitOut . "\n" . $pushOut);
+        } else {
+            $out = $commitOut;
+        }
+
+        // Reset remote URL agar token tidak tersimpan di .git/config
+        git('remote set-url origin ' . escapeshellarg($job['git_url']), $path);
     }
 
     if ($code === 0) {

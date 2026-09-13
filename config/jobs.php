@@ -45,16 +45,16 @@ function active_job($conn, int $project_id): ?array
  * Menitipkan pekerjaan. Bila untuk project itu masih ada yang berjalan,
  * yang lama dikembalikan supaya klik berulang tidak menumpuk antrean.
  */
-function queue_job($conn, int $project_id, int $user_id, string $action): array
+function queue_job($conn, int $project_id, int $user_id, string $action, ?string $commit_message = null): array
 {
     if ($existing = active_job($conn, $project_id)) {
         return ['job' => $existing, 'created' => false];
     }
 
     $stmt = $conn->prepare(
-        "INSERT INTO job_queue (project_id, user_id, action) VALUES (?, ?, ?)"
+        "INSERT INTO job_queue (project_id, user_id, action, commit_message) VALUES (?, ?, ?, ?)"
     );
-    $stmt->bind_param("iis", $project_id, $user_id, $action);
+    $stmt->bind_param("iiss", $project_id, $user_id, $action, $commit_message);
     $stmt->execute();
 
     $id = $conn->insert_id;
@@ -80,7 +80,12 @@ function job_payload(array $job): array
 
 function job_message(array $job): string
 {
-    $label = $job['action'] === 'clone' ? 'Clone' : 'Pull';
+    $label = match ($job['action']) {
+        'clone' => 'Clone',
+        'pull'  => 'Pull',
+        'push'  => 'Push',
+        default => ucfirst((string) $job['action']),
+    };
 
     return match ($job['status']) {
         'pending' => "$label menunggu giliran",
