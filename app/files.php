@@ -47,7 +47,7 @@ $webUrl = SITE_DOMAIN !== '' ? 'https://' . basename($root) . '.' . SITE_DOMAIN 
     <div class="vsc-topbar">
         <!-- Sisi Kiri: Tombol Kembali ke Dashboard & Tag Proyek -->
         <div class="vsc-topbar-left">
-            <a href="dashboard.php" class="vsc-btn vsc-btn-back" title="Kembali ke Dashboard cPanel">
+            <a href="dashboard.php" class="vsc-btn vsc-btn-back" onclick="return window.VSC_IDE ? window.VSC_IDE.confirmBackToDashboard(event) : confirm('Kembali ke Dashboard cPanel?');" title="Kembali ke Dashboard cPanel">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                 <span class="vsc-btn-back-text">Dashboard</span>
             </a>
@@ -107,7 +107,7 @@ $webUrl = SITE_DOMAIN !== '' ? 'https://' . basename($root) . '.' . SITE_DOMAIN 
                     🚀
                 </button>
             <?php endif; ?>
-            <a href="dashboard.php" class="vsc-act-btn" title="Kembali ke Dashboard">
+            <a href="dashboard.php" class="vsc-act-btn" onclick="return window.VSC_IDE ? window.VSC_IDE.confirmBackToDashboard(event) : confirm('Kembali ke Dashboard cPanel?');" title="Kembali ke Dashboard">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>
             </a>
         </div>

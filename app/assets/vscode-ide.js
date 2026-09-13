@@ -1196,8 +1196,30 @@
         });
     }
 
+    // ---------------- 12. Konfirmasi Kembali ke Dashboard ---------------- //
+    function confirmBackToDashboard(e) {
+        if (e && typeof e.preventDefault === 'function') {
+            e.preventDefault();
+        }
+        const dirtyTabs = tabs.filter(t => t.isDirty);
+        let msg = 'Yakin ingin kembali ke Dashboard cPanel?';
+        if (dirtyTabs.length > 0) {
+            const fileList = dirtyTabs.map(t => t.name).join(', ');
+            msg = `⚠️ Peringatan: Berkas berikut belum disimpan:
+- ${fileList}
+
+Perubahan Anda akan hilang jika keluar sekarang.
+Tetap kembali ke Dashboard?`;
+        }
+        if (confirm(msg)) {
+            window.location.href = 'dashboard.php';
+        }
+        return false;
+    }
+
     // Export ke window untuk event handler HTML
     window.VSC_IDE = {
+        confirmBackToDashboard,
         openFile,
         saveActiveFile,
         undo,
@@ -1242,6 +1264,15 @@
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                 e.preventDefault();
                 saveActiveFile();
+            }
+        });
+
+        // Peringatan saat menutup tab browser atau reload jika masih ada berkas belum disimpan
+        window.addEventListener('beforeunload', (e) => {
+            if (tabs.some(t => t.isDirty)) {
+                e.preventDefault();
+                e.returnValue = '';
+                return '';
             }
         });
 
