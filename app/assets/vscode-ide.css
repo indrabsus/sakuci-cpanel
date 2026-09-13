@@ -25,26 +25,41 @@
     --vsc-font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 }
 
-/* Reset total: halaman berkas menjadi 100% fullscreen */
+/* Reset total: halaman berkas menjadi 100% fullscreen (kompatibel penuh layar HP & Desktop) */
 html, body {
     margin: 0 !important;
     padding: 0 !important;
+    width: 100% !important;
     width: 100vw !important;
+    height: 100% !important;
     height: 100vh !important;
+    height: 100dvh !important;
+    height: -webkit-fill-available !important;
     overflow: hidden !important;
     background: var(--vsc-bg-dark) !important;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     color: var(--vsc-text-main);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }
 
 .vscode-workspace {
     display: flex;
     flex-direction: column;
+    width: 100%;
     width: 100vw;
+    height: 100%;
     height: 100vh;
+    height: 100dvh;
+    height: -webkit-fill-available;
     background: var(--vsc-bg-dark);
     overflow: hidden;
     user-select: none;
+    box-sizing: border-box;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* ---------------- Top Menubar / Toolbar ---------------- */
@@ -449,9 +464,11 @@ html, body {
 .vsc-editor-area {
     flex: 1;
     min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     background: var(--vsc-bg-dark);
+    overflow: hidden;
 }
 
 /* Tabs Bar */
@@ -1150,7 +1167,7 @@ html, body {
         gap: 6px;
         position: fixed;
         right: 14px;
-        bottom: 34px; /* Tepat di atas bottom statusbar */
+        bottom: calc(32px + env(safe-area-inset-bottom, 0px)) !important;
         z-index: 999;
         background: linear-gradient(135deg, #007acc, #0284c7);
         color: #ffffff;
@@ -1163,6 +1180,7 @@ html, body {
         cursor: pointer;
         user-select: none;
         transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+        opacity: 0.95;
     }
     .vscode-workspace.mode-editor .vsc-mobile-fab-save.show:active {
         transform: scale(0.95);
@@ -1195,10 +1213,22 @@ html, body {
     }
     .vscode-workspace.mode-editor .vsc-editor-area {
         width: 100vw !important;
+        height: 100% !important;
+        min-height: 0 !important;
         display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
     }
     .vscode-workspace.mode-editor .vsc-git-view {
         display: none !important;
+    }
+
+    .vsc-monaco-wrap {
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        height: 100% !important;
+        width: 100% !important;
+        position: relative !important;
     }
 
     .vscode-workspace.mode-git .vsc-git-view {

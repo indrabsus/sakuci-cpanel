@@ -31,7 +31,7 @@ $webUrl = SITE_DOMAIN !== '' ? 'https://' . basename($root) . '.' . SITE_DOMAIN 
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title><?php echo htmlspecialchars($project['name']); ?> &middot; Sakuci VS Code Editor</title>
 
 <!-- Font Lokal Inter & Styling VS Code IDE -->
@@ -148,6 +148,9 @@ $webUrl = SITE_DOMAIN !== '' ? 'https://' . basename($root) . '.' . SITE_DOMAIN 
                     </button>
                     <button type="button" class="vsc-subbar-tool-btn" id="vsc-subbar-redo-btn" onclick="window.VSC_IDE && window.VSC_IDE.redo()" title="Redo / Ulangi perubahan (Ctrl+Y)">
                         ↪️ <span class="vsc-subbar-btn-text">Redo</span>
+                    </button>
+                    <button type="button" class="vsc-subbar-tool-btn" id="vsc-subbar-bottom-btn" onclick="window.VSC_IDE && window.VSC_IDE.scrollToBottom()" title="Gulir ke Baris Paling Bawah">
+                        ⬇️ <span class="vsc-subbar-btn-text">Bawah</span>
                     </button>
                     <button type="button" class="vsc-subbar-save-btn" id="vsc-subbar-save-btn" onclick="window.VSC_IDE.saveActiveFile()" title="Simpan berkas (Ctrl+S)">
                         💾 <span class="vsc-subbar-save-text">Simpan</span>

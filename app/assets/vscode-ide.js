@@ -166,7 +166,8 @@
                 glyphMargin: false,
                 folding: !isMobile,
                 roundedSelection: true,
-                scrollBeyondLastLine: false,
+                scrollBeyondLastLine: true, // Pastikan bisa scroll leluasa sampai baris paling akhir
+                scrollBeyondLastColumn: 5,
                 readOnly: false,
                 tabSize: 4,
                 automaticLayout: true,
@@ -175,7 +176,21 @@
                 autoClosingBrackets: 'always',
                 autoClosingQuotes: 'always',
                 cursorBlinking: 'smooth',
-                padding: { top: 8, bottom: 8 },
+                wordWrap: isMobile ? 'on' : 'off', // Di HP bungkus kata agar tidak scroll horizontal berlebih
+                wrappingStrategy: 'advanced',
+                overviewRulerLanes: isMobile ? 0 : 2,
+                scrollbar: {
+                    vertical: 'auto',
+                    horizontal: 'auto',
+                    verticalScrollbarSize: isMobile ? 14 : 10,
+                    horizontalScrollbarSize: isMobile ? 14 : 10,
+                    alwaysConsumeMouseWheel: false,
+                    useShadows: false,
+                },
+                smoothScrolling: true,
+                mouseWheelScrollSensitivity: 1,
+                fastScrollSensitivity: 5,
+                padding: { top: 8, bottom: isMobile ? 240 : 60 }, // Ruang scroll lega di bagian bawah di HP
             });
 
             // Auto-closing tag saat mengetik '>'
@@ -250,7 +265,10 @@
         const fabBtn = document.getElementById('vsc-mobile-fab-save');
         if (mode === 'editor') {
             if (fabBtn && activeTabPath) fabBtn.classList.add('show');
-            if (editor) setTimeout(() => editor.layout(), 60);
+            if (editor) {
+                setTimeout(() => editor.layout(), 60);
+                setTimeout(() => editor.layout(), 250);
+            }
         } else {
             if (fabBtn) fabBtn.classList.remove('show');
             if (mode === 'git') {
@@ -367,6 +385,7 @@
             }
             editor.updateOptions({ readOnly: !tab.canEdit });
             editor.focus();
+            setTimeout(() => editor.layout(), 60);
         }
 
         if (elEmptyState) elEmptyState.style.display = 'none';
@@ -506,6 +525,23 @@
             const m = editor.getModel();
             if (m && typeof m.redo === 'function') m.redo();
         }
+        editor.focus();
+    }
+
+    function scrollToBottom() {
+        if (!editor) return;
+        const model = editor.getModel();
+        if (!model) return;
+        const lastLine = model.getLineCount();
+        editor.revealLine(lastLine);
+        editor.setPosition({ lineNumber: lastLine, column: model.getLineMaxColumn(lastLine) });
+        editor.focus();
+    }
+
+    function scrollToTop() {
+        if (!editor) return;
+        editor.revealLine(1);
+        editor.setPosition({ lineNumber: 1, column: 1 });
         editor.focus();
     }
 
@@ -1180,6 +1216,8 @@
         saveActiveFile,
         undo,
         redo,
+        scrollToBottom,
+        scrollToTop,
         promptNewFile,
         promptNewFolder,
         promptRename,
@@ -1221,18 +1259,32 @@
             }
         });
 
-        // Responsif saat rotasi HP atau resize jendela
-        window.addEventListener('resize', () => {
+        // Responsif saat rotasi HP, resize jendela, atau keyboard virtual muncul/hilang
+        function handleMobileResize() {
             const isMobile = window.innerWidth <= 768;
             if (editor) {
                 editor.updateOptions({
                     minimap: { enabled: !isMobile },
                     fontSize: isMobile ? 14 : 13.5,
                     lineNumbersMinChars: isMobile ? 3 : 5,
+                    scrollBeyondLastLine: true,
+                    wordWrap: isMobile ? 'on' : 'off',
+                    overviewRulerLanes: isMobile ? 0 : 2,
+                    padding: {
+                        top: 8,
+                        bottom: isMobile ? 240 : 60
+                    }
                 });
                 editor.layout();
             }
-        });
+        }
+
+        window.addEventListener('resize', handleMobileResize);
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                if (editor) editor.layout();
+            });
+        }
     });
 
 })();
