@@ -577,6 +577,9 @@ function salinCadangan(teks, selesai) {
                 <button type="button" class="designer-btn" onclick="window.DB_DESIGNER && window.DB_DESIGNER.openManageRelationsModal()" title="Lihat dan kelola seluruh relasi tabel">
                     📋 <span class="btn-label">Kelola Relasi</span>
                 </button>
+                <button type="button" class="designer-btn designer-btn-sync" onclick="window.DB_DESIGNER && window.DB_DESIGNER.openSyncCodeModal()" title="Sinkronkan struktur tabel ke Model & Berkas Migrasi kodingan projek">
+                    ⚡ <span class="btn-label">Sinkron ke Kodingan</span>
+                </button>
                 <button type="button" class="designer-btn" onclick="window.DB_DESIGNER && window.DB_DESIGNER.autoArrange()" title="Tata rapi tabel secara otomatis">
                     🪄 <span class="btn-label">Tata Otomatis</span>
                 </button>
@@ -992,6 +995,63 @@ function salinCadangan(teks, selesai) {
                 <div class="designer-submodal-footer">
                     <button type="button" class="designer-btn" onclick="window.DB_DESIGNER.closeSubmodal('edit-row')">Batal</button>
                     <button type="button" class="designer-btn designer-btn-primary" onclick="window.DB_DESIGNER.submitEditRow()">💾 Simpan Perubahan Data</button>
+                </div>
+            </div>
+        </div>
+        <!-- Submodal 9: Sinkronisasi Database ke Kodingan Projek (Model & Migration) -->
+        <div id="designer-modal-sync-code" class="designer-submodal-backdrop">
+            <div class="designer-submodal-card" style="max-width:820px">
+                <div class="designer-submodal-header" style="background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(6,182,212,0.15)); border-bottom: 1px solid rgba(16,185,129,0.3)">
+                    <div style="display:flex; align-items:center; gap:8px">
+                        <span style="font-size:18px">⚡</span>
+                        <div>
+                            <span style="font-weight:700; color:#10b981">Sinkronisasi Database ke Kodingan Projek</span>
+                            <div id="dsg-sync-project-info" style="font-size:11.5px; color:#94a3b8; font-weight:normal; margin-top:2px">
+                                Memeriksa kodingan projek...
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="designer-btn designer-btn-sm" onclick="window.DB_DESIGNER.closeSubmodal('sync-code')">✕</button>
+                </div>
+                <div class="designer-submodal-body">
+                    <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.2); border-radius:8px; padding:12px; margin-bottom:14px; font-size:12.5px; color:#cbd5e1; line-height:1.5">
+                        <div style="font-weight:600; color:#34d399; margin-bottom:4px; display:flex; align-items:center; gap:6px">
+                            <span>💡</span> <span>Otomatisasi Model &amp; Migrasi</span>
+                        </div>
+                        Fitur ini membaca tabel di database dan secara otomatis membuat/memperbarui <b>Model PHP</b> di folder <code>app/Models/</code> serta berkas <b>Migrasi SQL</b> di folder <code>database/migrations/</code> projek kodingan Anda. Riwayat migrasi juga didaftarkan agar perintah <code>php sakuci migrate</code> tetap konsisten dan tidak error.
+                    </div>
+
+                    <div id="dsg-sync-loading" style="text-align:center; padding:30px 10px; color:#94a3b8">
+                        <div class="spinner-border spinner-border-sm text-success" role="status" style="margin-bottom:8px"></div>
+                        <div>Menganalisis perbedaan tabel database dengan Model &amp; Berkas Migrasi...</div>
+                    </div>
+
+                    <div id="dsg-sync-error" style="display:none; padding:14px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:8px; color:#fca5a5; font-size:13px; margin-bottom:12px"></div>
+
+                    <div id="dsg-sync-content" style="display:none">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px">
+                            <div style="font-size:12px; color:#94a3b8">
+                                Pilih tabel dan item yang ingin disinkronkan ke kodingan:
+                            </div>
+                            <div style="display:flex; gap:12px; font-size:12px">
+                                <label style="display:flex; align-items:center; gap:4px; cursor:pointer; color:#38bdf8">
+                                    <input type="checkbox" id="dsg-sync-select-all" onchange="window.DB_DESIGNER.toggleSyncAll(this.checked)" checked>
+                                    Pilih Semua
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="dsg-sync-tables-wrap" class="designer-table-scroll" style="max-height:360px">
+                            <!-- Diisi dinamis oleh DB_DESIGNER.renderSyncTableDiff() -->
+                        </div>
+                    </div>
+                </div>
+                <div class="designer-submodal-footer" style="justify-content:space-between">
+                    <button type="button" class="designer-btn" onclick="window.DB_DESIGNER.closeSubmodal('sync-code')">Tutup</button>
+                    <button type="button" id="dsg-btn-do-sync" class="designer-btn designer-btn-sync" onclick="window.DB_DESIGNER.submitSyncCodebase()" style="display:inline-flex; align-items:center; gap:6px">
+                        <span>⚡</span>
+                        <span>Mulai Sinkronisasi</span>
+                    </button>
                 </div>
             </div>
         </div>

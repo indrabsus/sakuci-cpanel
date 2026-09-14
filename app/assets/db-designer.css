@@ -914,3 +914,93 @@
 .designer-col-row:hover .designer-col-edit-btn {
     display: inline-block;
 }
+
+
+/* Tombol Sinkron ke Kodingan di Toolbar */
+.designer-btn-sync {
+    background: linear-gradient(135deg, #059669, #0d9488) !important;
+    color: #ffffff !important;
+    border-color: rgba(52, 211, 153, 0.4) !important;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
+    transition: all 0.2s ease;
+}
+.designer-btn-sync:hover {
+    background: linear-gradient(135deg, #10b981, #14b8a6) !important;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+    transform: translateY(-1px);
+}
+
+/* Badges & Diff Styles for Sync Code Modal */
+.dsg-sync-card {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    transition: all 0.15s ease;
+}
+.dsg-sync-card:hover {
+    border-color: #475569;
+    background: rgba(30, 41, 59, 0.6);
+}
+.dsg-sync-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+.dsg-sync-tbl-name {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #f8fafc;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.dsg-sync-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+@media (max-width: 640px) {
+    .dsg-sync-grid {
+        grid-template-columns: 1fr;
+    }
+}
+.dsg-sync-item-box {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 12px;
+}
+.dsg-sync-badge-ok {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    color: #34d399;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+.dsg-sync-badge-new {
+    background: rgba(56, 189, 248, 0.15);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    color: #38bdf8;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+.dsg-sync-badge-update {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: #fbbf24;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 600;
+}

@@ -2139,6 +2139,248 @@
             .replace(/'/g, '&#039;');
     }
 
+
+    // ------------------------------------------------------------------
+    // FITUR 10: SINKRONISASI DATABASE KE KODINGAN (MODEL & MIGRATION)
+    // ------------------------------------------------------------------
+    let syncTablesData = [];
+
+    async function openSyncCodeModal() {
+        if (!activeDbId) return;
+
+        openSubmodal('sync-code');
+
+        const elLoading = document.getElementById('dsg-sync-loading');
+        const elContent = document.getElementById('dsg-sync-content');
+        const elError = document.getElementById('dsg-sync-error');
+        const elProjInfo = document.getElementById('dsg-sync-project-info');
+        const btnSync = document.getElementById('dsg-btn-do-sync');
+
+        if (elLoading) elLoading.style.display = 'block';
+        if (elContent) elContent.style.display = 'none';
+        if (elError) elError.style.display = 'none';
+        if (btnSync) btnSync.disabled = true;
+
+        try {
+            const res = await fetch(`app/api/db-designer.php?action=get_sync_status&db_id=${activeDbId}`, {
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+
+            if (!data.ok) {
+                if (elLoading) elLoading.style.display = 'none';
+                if (elError) {
+                    elError.textContent = data.error || 'Gagal memuat status sinkronisasi projek.';
+                    elError.style.display = 'block';
+                }
+                return;
+            }
+
+            if (elProjInfo && data.project) {
+                elProjInfo.innerHTML = `Projek: <b style="color:#38bdf8">${escapeHtml(data.project.name)}</b> &bull; Lokasi: <code style="color:#cbd5e1">${escapeHtml(data.project.local_path)}</code>`;
+            }
+
+            syncTablesData = data.tables || [];
+            renderSyncTableDiff(syncTablesData);
+
+            if (elLoading) elLoading.style.display = 'none';
+            if (elContent) elContent.style.display = 'block';
+            if (btnSync) btnSync.disabled = false;
+
+        } catch (err) {
+            if (elLoading) elLoading.style.display = 'none';
+            if (elError) {
+                elError.textContent = 'Kesalahan jaringan: ' + err.message;
+                elError.style.display = 'block';
+            }
+        }
+    }
+
+    function renderSyncTableDiff(tables) {
+        const wrap = document.getElementById('dsg-sync-tables-wrap');
+        if (!wrap) return;
+
+        if (!tables || tables.length === 0) {
+            wrap.innerHTML = `<div style="text-align:center; padding:20px; color:#94a3b8">Tidak ada tabel terdaftar di database ini.</div>`;
+            return;
+        }
+
+        let html = '';
+        tables.forEach(t => {
+            const m = t.model || {};
+            const mig = t.migration || {};
+
+            let mBadge = '';
+            if (m.badge_type === 'ok') {
+                mBadge = `<span class="dsg-sync-badge-ok">✔ ${escapeHtml(m.badge)}</span>`;
+            } else if (m.badge_type === 'update') {
+                mBadge = `<span class="dsg-sync-badge-update">⚠️ ${escapeHtml(m.badge)}</span>`;
+            } else {
+                mBadge = `<span class="dsg-sync-badge-new">✨ ${escapeHtml(m.badge)}</span>`;
+            }
+
+            let migBadge = '';
+            if (mig.badge_type === 'ok') {
+                migBadge = `<span class="dsg-sync-badge-ok">✔ ${escapeHtml(mig.badge)}</span>`;
+            } else if (mig.badge_type === 'update') {
+                migBadge = `<span class="dsg-sync-badge-update">⚠️ ${escapeHtml(mig.badge)}</span>`;
+            } else {
+                migBadge = `<span class="dsg-sync-badge-new">✨ ${escapeHtml(mig.badge)}</span>`;
+            }
+
+            const checkModelDefault = (m.status !== 'synced');
+            const checkMigDefault = (mig.status !== 'synced');
+
+            html += `
+                <div class="dsg-sync-card" data-table="${escapeHtml(t.name)}">
+                    <div class="dsg-sync-card-header">
+                        <div class="dsg-sync-tbl-name">
+                            <span>📦</span>
+                            <span>${escapeHtml(t.name)}</span>
+                            <span style="font-size:11px; font-weight:normal; background:rgba(255,255,255,0.08); padding:2px 6px; border-radius:4px; color:#94a3b8">
+                                ${t.columns_count} kolom${t.pk_column ? ' • PK: ' + escapeHtml(t.pk_column) : ''}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="dsg-sync-grid">
+                        <!-- Kolom Kiri: Model PHP -->
+                        <div class="dsg-sync-item-box">
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px">
+                                <span style="font-weight:600; color:#e2e8f0">📄 Model PHP</span>
+                                ${mBadge}
+                            </div>
+                            <div style="color:#94a3b8; font-size:11.5px; margin-bottom:6px">
+                                File: <code style="color:#38bdf8">${escapeHtml(m.file || (m.name + '.php'))}</code>
+                            </div>
+                            <div style="font-size:11px; color:#64748b; margin-bottom:8px">
+                                ${escapeHtml(m.detail)}
+                            </div>
+                            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; color:#f1f5f9; font-weight:500; font-size:11.5px">
+                                <input type="checkbox" class="dsg-sync-chk-model" data-table="${escapeHtml(t.name)}" ${checkModelDefault ? 'checked' : ''}>
+                                ${m.exists ? 'Perbarui $fillable Model' : 'Buat Berkas Model Baru'}
+                            </label>
+                        </div>
+
+                        <!-- Kolom Kanan: Migrasi SQL -->
+                        <div class="dsg-sync-item-box">
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px">
+                                <span style="font-weight:600; color:#e2e8f0">⚡ Migrasi SQL</span>
+                                ${migBadge}
+                            </div>
+                            <div style="color:#94a3b8; font-size:11.5px; margin-bottom:6px">
+                                File: <code style="color:#38bdf8">${escapeHtml(mig.file || ('..._create_' + t.name + '_table.sql'))}</code>
+                            </div>
+                            <div style="font-size:11px; color:#64748b; margin-bottom:8px">
+                                ${escapeHtml(mig.detail)}
+                            </div>
+                            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; color:#f1f5f9; font-weight:500; font-size:11.5px">
+                                <input type="checkbox" class="dsg-sync-chk-mig" data-table="${escapeHtml(t.name)}" ${checkMigDefault ? 'checked' : ''}>
+                                ${mig.exists ? 'Catat ke Riwayat Migrasi' : 'Buat Berkas Migrasi SQL'}
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        wrap.innerHTML = html;
+    }
+
+    function toggleSyncAll(checked) {
+        document.querySelectorAll('.dsg-sync-chk-model').forEach(chk => {
+            chk.checked = checked;
+        });
+        document.querySelectorAll('.dsg-sync-chk-mig').forEach(chk => {
+            chk.checked = checked;
+        });
+    }
+
+    async function submitSyncCodebase() {
+        if (!activeDbId) return;
+
+        const items = [];
+        const cards = document.querySelectorAll('.dsg-sync-card');
+        cards.forEach(card => {
+            const tName = card.getAttribute('data-table');
+            const chkM = card.querySelector('.dsg-sync-chk-model');
+            const chkMig = card.querySelector('.dsg-sync-chk-mig');
+            const doM = chkM && chkM.checked;
+            const doMig = chkMig && chkMig.checked;
+            if (doM || doMig) {
+                items.push({
+                    table: tName,
+                    sync_model: doM,
+                    sync_migration: doMig
+                });
+            }
+        });
+
+        if (items.length === 0) {
+            alert('Silakan pilih minimal 1 item (Model atau Migrasi) untuk disinkronkan ke kodingan.');
+            return;
+        }
+
+        const btnSync = document.getElementById('dsg-btn-do-sync');
+        const origBtnHtml = btnSync ? btnSync.innerHTML : '';
+        if (btnSync) {
+            btnSync.disabled = true;
+            btnSync.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" style="width:14px; height:14px"></span> Menyinkronkan...`;
+        }
+
+        try {
+            const fd = new FormData();
+            fd.append('db_id', activeDbId);
+            fd.append('action', 'sync_codebase');
+            fd.append('items', JSON.stringify(items));
+
+            const res = await fetch('app/api/db-designer.php', {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+
+            if (btnSync) {
+                btnSync.disabled = false;
+                btnSync.innerHTML = origBtnHtml;
+            }
+
+            if (!data.ok) {
+                alert('Sinkronisasi gagal: ' + (data.error || 'Terjadi kesalahan sistem.'));
+                return;
+            }
+
+            let msg = '🎉 Sinkronisasi ke kodingan berhasil diselesaikan!\n\n';
+            if (data.models_created && data.models_created.length) {
+                msg += '• Model Baru Dibuat:\n  ' + data.models_created.join(', ') + '\n';
+            }
+            if (data.models_updated && data.models_updated.length) {
+                msg += '• Model Diperbarui:\n  ' + data.models_updated.join(', ') + '\n';
+            }
+            if (data.migrations_created && data.migrations_created.length) {
+                msg += '• Berkas Migrasi SQL Dibuat:\n  ' + data.migrations_created.join('\n  ') + '\n';
+            }
+            if (data.migrations_registered && data.migrations_registered.length) {
+                msg += '• Migrasi Dicatat di Database:\n  ' + data.migrations_registered.join(', ') + '\n';
+            }
+            if (data.errors && data.errors.length) {
+                msg += '\nPeringatan:\n' + data.errors.join('\n');
+            }
+
+            alert(msg);
+
+            // Muat ulang status agar terupdate
+            openSyncCodeModal();
+
+        } catch (err) {
+            if (btnSync) {
+                btnSync.disabled = false;
+                btnSync.innerHTML = origBtnHtml;
+            }
+            alert('Kesalahan jaringan: ' + err.message);
+        }
+    }
+
     // ------------------------------------------------------------------
     // API PUBLIK WINDOW.DB_DESIGNER
     // ------------------------------------------------------------------
@@ -2181,6 +2423,9 @@
         submitEditRow,
         deleteTableRow,
         closeSubmodal,
+        openSyncCodeModal,
+        toggleSyncAll,
+        submitSyncCodebase,
         reload: () => reloadSchema(false)
     };
 

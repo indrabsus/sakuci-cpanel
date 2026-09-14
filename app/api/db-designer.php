@@ -25,7 +25,7 @@ if ($db_id <= 0) {
 }
 
 // Ambil data database siswa dengan verifikasi kepemilikan
-$sql = "SELECT d.id, d.db_name, d.db_host, d.db_port, du.username, du.password
+$sql = "SELECT d.id, d.user_id, d.db_name, d.db_host, d.db_port, d.project_id, du.username, du.password
           FROM db_list d
           LEFT JOIN db_users du ON du.db_id = d.id
          WHERE d.id = ?" . ($isAdmin ? "" : " AND d.user_id = ?");
@@ -58,6 +58,114 @@ function validate_sql_ident($ident, $maxLen = 64) {
     }
     return true;
 }
+
+// Konversi nama tabel ke nama Model PascalCase ala Sakuci / Laravel
+function table_to_model_name(string $table): string {
+    $name = strtolower(trim($table));
+    $name = preg_replace('/^(tbl_|tb_)/', '', $name);
+    if (str_ends_with($name, 'ies')) {
+        $name = substr($name, 0, -3) . 'y';
+    } elseif (str_ends_with($name, 'es') && (str_ends_with($name, 'sses') || str_ends_with($name, 'shes') || str_ends_with($name, 'ches') || str_ends_with($name, 'xes'))) {
+        $name = substr($name, 0, -2);
+    } elseif (str_ends_with($name, 's') && !str_ends_with($name, 'ss')) {
+        if (!in_array($name, ['kelas', 'status', 'basis', 'karcis', 'beras', 'petugas', 'proses', 'akses', 'kursus'])) {
+            $name = substr($name, 0, -1);
+        }
+    }
+    $parts = explode('_', $name);
+    $studly = '';
+    foreach ($parts as $p) {
+        $studly .= ucfirst($p);
+    }
+    return $studly ?: 'MyModel';
+}
+
+// Generate kode Model baru
+function generate_model_code(string $modelName, string $tableName, string $pkCol, array $fillableCols, bool $hasTimestamps = true): string {
+    $fillableStr = empty($fillableCols) 
+        ? "[]" 
+        : "[\n        '" . implode("',\n        '", $fillableCols) . "'\n    ]";
+    
+    $pkProperty = ($pkCol !== '' && $pkCol !== 'id') 
+        ? "\n    protected string \$primaryKey = '{$pkCol}';\n" 
+        : "";
+
+    $tsProperty = !$hasTimestamps 
+        ? "\n    public bool \$timestamps = false;\n" 
+        : "";
+
+    return "<?php\n\n"
+        . "namespace App\\Models;\n\n"
+        . "use Sakuci\\Database\\Model;\n\n"
+        . "class {$modelName} extends Model\n"
+        . "{\n"
+        . "    protected static ?string \$table = '{$tableName}';\n"
+        . $pkProperty
+        . $tsProperty . "\n"
+        . "    protected array \$fillable = {$fillableStr};\n"
+        . "}\n";
+}
+
+// Perbarui kode Model yang sudah ada tanpa merusak method kustom siswa
+function update_existing_model_code(string $existingCode, string $tableName, string $pkCol, array $fillableCols, bool $hasTimestamps = true): string {
+    $fillableStr = empty($fillableCols)
+        ? "[]"
+        : "[\n        '" . implode("',\n        '", $fillableCols) . "'\n    ]";
+    
+    if (preg_match('/(protected|public)\s+array\s+\$fillable\s*=\s*(\[[^\]]*\]);/s', $existingCode)) {
+        $newCode = preg_replace(
+            '/(protected|public)\s+array\s+\$fillable\s*=\s*(\[[^\]]*\]);/s',
+            "protected array \$fillable = {$fillableStr};",
+            $existingCode,
+            1
+        );
+    } elseif (preg_match('/(protected|public)\s+\$fillable\s*=\s*(\[[^\]]*\]);/s', $existingCode)) {
+        $newCode = preg_replace(
+            '/(protected|public)\s+\$fillable\s*=\s*(\[[^\]]*\]);/s',
+            "protected array \$fillable = {$fillableStr};",
+            $existingCode,
+            1
+        );
+    } else {
+        $lastBrace = strrpos($existingCode, '}');
+        if ($lastBrace !== false) {
+            $insert = "\n    protected array \$fillable = {$fillableStr};\n";
+            $newCode = substr($existingCode, 0, $lastBrace) . $insert . substr($existingCode, $lastBrace);
+        } else {
+            $newCode = $existingCode;
+        }
+    }
+
+    if ($pkCol !== '' && $pkCol !== 'id') {
+        if (!preg_match('/\$primaryKey\s*=/', $newCode)) {
+            if (strpos($newCode, '$fillable') !== false) {
+                $newCode = preg_replace(
+                    '/(protected\s+(?:array\s+)?\$fillable)/',
+                    "protected string \$primaryKey = '{$pkCol}';\n\n    $1",
+                    $newCode,
+                    1
+                );
+            }
+        }
+    }
+
+
+    if (!$hasTimestamps) {
+        if (!preg_match('/\$timestamps\s*=/', $newCode)) {
+            if (strpos($newCode, '$fillable') !== false) {
+                $newCode = preg_replace(
+                    '/(protected\s+(?:array\s+)?\$fillable)/',
+                    "public bool \$timestamps = false;\n\n    $1",
+                    $newCode,
+                    1
+                );
+            }
+        }
+    }
+
+    return $newCode;
+}
+
 
 try {
     // -------------------------------------------------------------
@@ -722,8 +830,436 @@ try {
         }
     }
 
+    
     // -------------------------------------------------------------
-    // 10. DEFAULT ACTION: SCHEMA (Ambil seluruh skema database & relasi)
+    // 10. ACTION: GET_SYNC_STATUS (Cek status sinkronisasi ke kodingan)
+    // -------------------------------------------------------------
+    if ($action === 'get_sync_status') {
+        $project_id = (int) ($dbRow['project_id'] ?? 0);
+        $project = null;
+        if ($project_id > 0) {
+            $pStmt = $conn->prepare("SELECT id, user_id, name, domain, local_path FROM projects WHERE id = ?");
+            $pStmt->bind_param("i", $project_id);
+            $pStmt->execute();
+            $project = $pStmt->get_result()->fetch_assoc();
+        }
+        if (!$project) {
+            $uId = (int) ($dbRow['user_id'] ?? $user_id);
+            $pStmt = $conn->prepare("SELECT id, user_id, name, domain, local_path FROM projects WHERE user_id = ? ORDER BY id DESC LIMIT 1");
+            $pStmt->bind_param("i", $uId);
+            $pStmt->execute();
+            $project = $pStmt->get_result()->fetch_assoc();
+        }
+
+        if (!$project || empty($project['local_path'])) {
+            echo json_encode(['ok' => false, 'error' => 'Database ini belum terhubung ke projek kodingan manapun. Pastikan projek sudah dibuat di cPanel.']);
+            exit;
+        }
+
+        $projectPath = rtrim($project['local_path'], '/');
+        if (!is_dir($projectPath)) {
+            echo json_encode(['ok' => false, 'error' => "Direktori projek tidak ditemukan di server: {$projectPath}"]);
+            exit;
+        }
+
+        $modelsDir = $projectPath . '/app/Models';
+        $migrationsDir = $projectPath . '/database/migrations';
+        if (!is_dir($modelsDir)) {
+            @mkdir($modelsDir, 0755, true);
+        }
+        if (!is_dir($migrationsDir)) {
+            @mkdir($migrationsDir, 0755, true);
+        }
+
+        // Ambil seluruh migrasi yang tercatat di database siswa
+        $recordedMigrations = [];
+        $mRes = $dbConn->query("SELECT migration FROM migrations");
+        if ($mRes) {
+            while ($mRow = $mRes->fetch_assoc()) {
+                $recordedMigrations[$mRow['migration']] = true;
+            }
+        }
+
+        $modelFiles = glob($modelsDir . '/*.php') ?: [];
+        $migrationFiles = glob($migrationsDir . '/*.sql') ?: [];
+
+        // Ambil semua tabel dasar (abaikan tabel migrations)
+        $tablesRes = $dbConn->query("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'");
+        $tableList = [];
+        if ($tablesRes) {
+            while ($tRow = $tablesRes->fetch_array()) {
+                if ($tRow[0] === 'migrations') continue;
+                $tableList[] = $tRow[0];
+            }
+        }
+
+        $resultTables = [];
+        foreach ($tableList as $tName) {
+            // Ambil kolom dan PK
+            $colRes = $dbConn->query("SHOW FULL COLUMNS FROM `{$tName}`");
+            $columns = [];
+            $pkCol = '';
+            $fillableCols = [];
+
+            if ($colRes) {
+                while ($c = $colRes->fetch_assoc()) {
+                    $cName = $c['Field'];
+                    $isPk = ($c['Key'] === 'PRI');
+                    $isAi = (stripos($c['Extra'], 'auto_increment') !== false);
+                    if ($isPk && empty($pkCol)) {
+                        $pkCol = $cName;
+                    }
+                    $columns[] = [
+                        'name' => $cName,
+                        'type' => $c['Type'],
+                        'is_pk' => $isPk,
+                        'is_ai' => $isAi
+                    ];
+
+                    // Hitung fillable: abaikan PK auto_increment, created_at, updated_at
+                    if (!$isAi && !in_array($cName, ['created_at', 'updated_at'])) {
+                        $fillableCols[] = $cName;
+                    }
+                }
+            }
+
+            // Cari Model yang cocok
+            $modelName = table_to_model_name($tName);
+            $matchedModelFile = null;
+            $matchedModelPath = null;
+
+            foreach ($modelFiles as $mf) {
+                $content = file_get_contents($mf);
+                if (preg_match('/\$table\s*=\s*[\'"]' . preg_quote($tName, '/') . '[\'"]/', $content)) {
+                    $matchedModelFile = basename($mf);
+                    $matchedModelPath = $mf;
+                    break;
+                }
+                $base = basename($mf, '.php');
+                if (strcasecmp($base, $modelName) === 0 || strcasecmp($base, $tName) === 0) {
+                    $matchedModelFile = basename($mf);
+                    $matchedModelPath = $mf;
+                }
+            }
+
+            $modelInfo = [
+                'name' => $modelName,
+                'file' => $matchedModelFile,
+                'exists' => ($matchedModelFile !== null),
+                'status' => 'missing',
+                'badge' => 'Belum Ada',
+                'badge_type' => 'new',
+                'detail' => "Akan dibuat app/Models/{$modelName}.php",
+                'fillable' => $fillableCols,
+                'missing_cols' => []
+            ];
+
+            if ($matchedModelPath && is_file($matchedModelPath)) {
+                $code = file_get_contents($matchedModelPath);
+                $existingFillable = [];
+                if (preg_match('/\$fillable\s*=\s*\[(.*?)\]/s', $code, $fm)) {
+                    preg_match_all('/[\'"]([a-zA-Z0-9_]+)[\'"]/', $fm[1], $cm);
+                    $existingFillable = $cm[1] ?? [];
+                }
+                $missingCols = array_values(array_diff($fillableCols, $existingFillable));
+                if (!empty($missingCols)) {
+                    $modelInfo['status'] = 'needs_update';
+                    $modelInfo['badge'] = 'Perlu Update';
+                    $modelInfo['badge_type'] = 'update';
+                    $modelInfo['detail'] = 'Kolom baru terdeteksi: ' . implode(', ', $missingCols);
+                    $modelInfo['missing_cols'] = $missingCols;
+                } else {
+                    $modelInfo['status'] = 'synced';
+                    $modelInfo['badge'] = 'Sudah Cocok';
+                    $modelInfo['badge_type'] = 'ok';
+                    $modelInfo['detail'] = 'Struktur model sudah sesuai';
+                }
+            }
+
+            // Cari Berkas Migrasi yang cocok
+            $matchedMigrationFile = null;
+            $singularTable = rtrim($tName, 's');
+            foreach ($migrationFiles as $mf) {
+                $bName = basename($mf);
+                if (preg_match('/_create_' . preg_quote($tName, '/') . '_table\.sql$/i', $bName) ||
+                    preg_match('/_create_' . preg_quote($tName . 's', '/') . '_table\.sql$/i', $bName) ||
+                    ($singularTable !== $tName && preg_match('/_create_' . preg_quote($singularTable, '/') . '_table\.sql$/i', $bName))) {
+                    $matchedMigrationFile = $bName;
+                    break;
+                }
+            }
+            if (!$matchedMigrationFile) {
+                foreach ($migrationFiles as $mf) {
+                    $mContent = file_get_contents($mf);
+                    if (preg_match('/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?' . preg_quote($tName, '/') . '`?\s*\(/i', $mContent)) {
+                        $matchedMigrationFile = basename($mf);
+                        break;
+                    }
+                }
+            }
+
+            $migInfo = [
+                'file' => $matchedMigrationFile,
+                'exists' => ($matchedMigrationFile !== null),
+                'recorded' => false,
+                'status' => 'missing',
+                'badge' => 'Belum Ada',
+                'badge_type' => 'new',
+                'detail' => "Akan dibuat berkas database/migrations/..._create_{$tName}_table.sql"
+            ];
+
+            if ($matchedMigrationFile) {
+                $isRecorded = isset($recordedMigrations[$matchedMigrationFile]);
+                $migInfo['recorded'] = $isRecorded;
+                if ($isRecorded) {
+                    $migInfo['status'] = 'synced';
+                    $migInfo['badge'] = 'Tercatat';
+                    $migInfo['badge_type'] = 'ok';
+                    $migInfo['detail'] = "Berkas {$matchedMigrationFile} & tercatat di database";
+                } else {
+                    $migInfo['status'] = 'unrecorded';
+                    $migInfo['badge'] = 'Belum Dicatat';
+                    $migInfo['badge_type'] = 'update';
+                    $migInfo['detail'] = "Berkas {$matchedMigrationFile} ada tapi belum dicatat di tabel migrations";
+                }
+            }
+
+            $resultTables[] = [
+                'name' => $tName,
+                'pk_column' => $pkCol,
+                'columns_count' => count($columns),
+                'model' => $modelInfo,
+                'migration' => $migInfo
+            ];
+        }
+
+        echo json_encode([
+            'ok' => true,
+            'project' => [
+                'id' => (int) $project['id'],
+                'name' => $project['name'],
+                'domain' => $project['domain'],
+                'local_path' => $project['local_path']
+            ],
+            'tables' => $resultTables
+        ]);
+        exit;
+    }
+
+    // -------------------------------------------------------------
+    // 11. ACTION: SYNC_CODEBASE (Buat / perbarui Model & Migrasi SQL)
+    // -------------------------------------------------------------
+    if ($action === 'sync_codebase') {
+        $itemsRaw = $_POST['items'] ?? '[]';
+        $items = json_decode($itemsRaw, true);
+        if (!is_array($items) || empty($items)) {
+            echo json_encode(['ok' => false, 'error' => 'Tidak ada tabel yang dipilih untuk disinkronkan.']);
+            exit;
+        }
+
+        $project_id = (int) ($dbRow['project_id'] ?? 0);
+        $project = null;
+        if ($project_id > 0) {
+            $pStmt = $conn->prepare("SELECT id, user_id, name, domain, local_path FROM projects WHERE id = ?");
+            $pStmt->bind_param("i", $project_id);
+            $pStmt->execute();
+            $project = $pStmt->get_result()->fetch_assoc();
+        }
+        if (!$project) {
+            $uId = (int) ($dbRow['user_id'] ?? $user_id);
+            $pStmt = $conn->prepare("SELECT id, user_id, name, domain, local_path FROM projects WHERE user_id = ? ORDER BY id DESC LIMIT 1");
+            $pStmt->bind_param("i", $uId);
+            $pStmt->execute();
+            $project = $pStmt->get_result()->fetch_assoc();
+        }
+
+        if (!$project || empty($project['local_path'])) {
+            echo json_encode(['ok' => false, 'error' => 'Projek kodingan tidak ditemukan.']);
+            exit;
+        }
+
+        $projectPath = rtrim($project['local_path'], '/');
+        $modelsDir = $projectPath . '/app/Models';
+        $migrationsDir = $projectPath . '/database/migrations';
+        if (!is_dir($modelsDir)) {
+            @mkdir($modelsDir, 0755, true);
+        }
+        if (!is_dir($migrationsDir)) {
+            @mkdir($migrationsDir, 0755, true);
+        }
+
+        // Pastikan tabel migrations ada di database siswa
+        $dbConn->query("CREATE TABLE IF NOT EXISTS migrations (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            migration VARCHAR(255),
+            ran_at VARCHAR(32)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        $modelsCreated = [];
+        $modelsUpdated = [];
+        $migrationsCreated = [];
+        $migrationsRegistered = [];
+        $errors = [];
+
+        $modelFiles = glob($modelsDir . '/*.php') ?: [];
+        $migrationFiles = glob($migrationsDir . '/*.sql') ?: [];
+
+        $timeOffset = 0;
+
+        foreach ($items as $item) {
+            $tName = trim($item['table'] ?? '');
+            $doModel = !empty($item['sync_model']);
+            $doMigration = !empty($item['sync_migration']);
+
+            if (!validate_sql_ident($tName)) {
+                continue;
+            }
+
+            // Ambil kolom dan PK
+            $colRes = $dbConn->query("SHOW FULL COLUMNS FROM `{$tName}`");
+            if (!$colRes) {
+                continue;
+            }
+            $pkCol = '';
+            $fillableCols = [];
+            $hasCreatedAt = false;
+            $hasUpdatedAt = false;
+            while ($c = $colRes->fetch_assoc()) {
+                $cName = $c['Field'];
+                $isPk = ($c['Key'] === 'PRI');
+                $isAi = (stripos($c['Extra'], 'auto_increment') !== false);
+                if ($cName === 'created_at') $hasCreatedAt = true;
+                if ($cName === 'updated_at') $hasUpdatedAt = true;
+                if ($isPk && empty($pkCol)) {
+                    $pkCol = $cName;
+                }
+                if (!$isAi && !in_array($cName, ['created_at', 'updated_at'])) {
+                    $fillableCols[] = $cName;
+                }
+            }
+            $hasTimestamps = ($hasCreatedAt && $hasUpdatedAt);
+
+            // 1. SINKRONKAN MODEL
+            if ($doModel) {
+                $modelName = table_to_model_name($tName);
+                $matchedModelPath = null;
+                $matchedModelFile = null;
+
+                foreach ($modelFiles as $mf) {
+                    $content = file_get_contents($mf);
+                    if (preg_match('/\$table\s*=\s*[\'"]' . preg_quote($tName, '/') . '[\'"]/', $content)) {
+                        $matchedModelFile = basename($mf);
+                        $matchedModelPath = $mf;
+                        break;
+                    }
+                    $base = basename($mf, '.php');
+                    if (strcasecmp($base, $modelName) === 0 || strcasecmp($base, $tName) === 0) {
+                        $matchedModelFile = basename($mf);
+                        $matchedModelPath = $mf;
+                    }
+                }
+
+                if ($matchedModelPath && is_file($matchedModelPath)) {
+                    $existingCode = file_get_contents($matchedModelPath);
+                    $newCode = update_existing_model_code($existingCode, $tName, $pkCol, $fillableCols, $hasTimestamps);
+                    if (file_put_contents($matchedModelPath, $newCode) !== false) {
+                        $modelsUpdated[] = $matchedModelFile;
+                    } else {
+                        $errors[] = "Gagal memperbarui file {$matchedModelFile}";
+                    }
+                } else {
+                    $newCode = generate_model_code($modelName, $tName, $pkCol, $fillableCols, $hasTimestamps);
+                    $targetPath = $modelsDir . '/' . $modelName . '.php';
+                    if (file_put_contents($targetPath, $newCode) !== false) {
+                        $modelsCreated[] = $modelName . '.php';
+                        $modelFiles[] = $targetPath;
+                    } else {
+                        $errors[] = "Gagal membuat file {$modelName}.php";
+                    }
+                }
+            }
+
+            // 2. SINKRONKAN MIGRASI
+            if ($doMigration) {
+                $matchedMigrationFile = null;
+                $singularTable = rtrim($tName, 's');
+                foreach ($migrationFiles as $mf) {
+                    $bName = basename($mf);
+                    if (preg_match('/_create_' . preg_quote($tName, '/') . '_table\.sql$/i', $bName) ||
+                        preg_match('/_create_' . preg_quote($tName . 's', '/') . '_table\.sql$/i', $bName) ||
+                        ($singularTable !== $tName && preg_match('/_create_' . preg_quote($singularTable, '/') . '_table\.sql$/i', $bName))) {
+                        $matchedMigrationFile = $bName;
+                        break;
+                    }
+                }
+                if (!$matchedMigrationFile) {
+                    foreach ($migrationFiles as $mf) {
+                        $mContent = file_get_contents($mf);
+                        if (preg_match('/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?' . preg_quote($tName, '/') . '`?\s*\(/i', $mContent)) {
+                            $matchedMigrationFile = basename($mf);
+                            break;
+                        }
+                    }
+                }
+
+                $nowStr = date('Y-m-d H:i:s');
+                if ($matchedMigrationFile) {
+                    $checkStmt = $dbConn->prepare("SELECT id FROM migrations WHERE migration = ? LIMIT 1");
+                    $checkStmt->bind_param("s", $matchedMigrationFile);
+                    $checkStmt->execute();
+                    $hasRec = $checkStmt->get_result()->fetch_assoc();
+                    if (!$hasRec) {
+                        $insStmt = $dbConn->prepare("INSERT INTO migrations (migration, ran_at) VALUES (?, ?)");
+                        $insStmt->bind_param("ss", $matchedMigrationFile, $nowStr);
+                        $insStmt->execute();
+                        $migrationsRegistered[] = $matchedMigrationFile;
+                    }
+                } else {
+                    $createRes = $dbConn->query("SHOW CREATE TABLE `{$tName}`");
+                    if ($createRes) {
+                        $cRow = $createRes->fetch_assoc();
+                        $rawSql = $cRow['Create Table'] ?? '';
+                        if (!empty($rawSql)) {
+                            if (!preg_match('/CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS/i', $rawSql)) {
+                                $rawSql = preg_replace('/CREATE\s+TABLE\s+(`?' . preg_quote($tName, '/') . '`?)/i', 'CREATE TABLE IF NOT EXISTS $1', $rawSql, 1);
+                            }
+                            $sqlContent = "-- create_{$tName}_table\n\n" . trim($rawSql) . ";\n";
+
+                            $waktu = time() + $timeOffset;
+                            $timeOffset++;
+                            $migFilename = date('Y_m_d_His', $waktu) . "_create_{$tName}_table.sql";
+                            $targetMigPath = $migrationsDir . '/' . $migFilename;
+
+                            if (file_put_contents($targetMigPath, $sqlContent) !== false) {
+                                $migrationsCreated[] = $migFilename;
+                                $migrationFiles[] = $targetMigPath;
+
+                                $insStmt = $dbConn->prepare("INSERT INTO migrations (migration, ran_at) VALUES (?, ?)");
+                                $insStmt->bind_param("ss", $migFilename, $nowStr);
+                                $insStmt->execute();
+                            } else {
+                                $errors[] = "Gagal membuat berkas migrasi {$migFilename}";
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        echo json_encode([
+            'ok' => true,
+            'message' => 'Sinkronisasi kodingan berhasil dijalankan!',
+            'models_created' => $modelsCreated,
+            'models_updated' => $modelsUpdated,
+            'migrations_created' => $migrationsCreated,
+            'migrations_registered' => $migrationsRegistered,
+            'errors' => $errors
+        ]);
+        exit;
+    }
+
+    // -------------------------------------------------------------
+    // 12. DEFAULT ACTION: SCHEMA (Ambil seluruh skema database & relasi)
     // -------------------------------------------------------------
     // 1. Ambil seluruh tabel
     $tablesMeta = [];
