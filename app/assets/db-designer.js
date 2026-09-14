@@ -462,9 +462,11 @@
         document.removeEventListener('mouseup', onCardDragEnd);
     }
 
-    // Sentuhan di Handphone / Tablet
+    // Sentuhan di Handphone / Tablet untuk memindahkan kartu tabel
     function startCardDragTouch(e, card) {
         if (e.touches.length !== 1) return;
+        // Jangan geser kartu jika tombol preview diklik
+        if (e.target.closest('.designer-card-btn-preview') || e.target.closest('button')) return;
         e.stopPropagation();
 
         const touch = e.touches[0];
@@ -479,13 +481,18 @@
 
         card.classList.add('dragging');
 
+        // Bawa kartu yang digeser ke layer terdepan
+        document.querySelectorAll('.designer-card').forEach(c => c.style.zIndex = '10');
+        card.style.zIndex = '50';
+
         document.addEventListener('touchmove', onCardDragMoveTouch, { passive: false });
         document.addEventListener('touchend', onCardDragEndTouch);
+        document.addEventListener('touchcancel', onCardDragEndTouch);
     }
 
     function onCardDragMoveTouch(e) {
         if (!draggedCard || e.touches.length !== 1) return;
-        e.preventDefault(); // Cegah scrolling browser bawaan
+        if (e.cancelable) e.preventDefault(); // Cegah scrolling browser bawaan
 
         const touch = e.touches[0];
         const deltaX = (touch.clientX - dragStartX) / scale;
@@ -506,10 +513,12 @@
     function onCardDragEndTouch() {
         if (draggedCard) {
             draggedCard.classList.remove('dragging');
+            draggedCard.style.zIndex = '10';
             draggedCard = null;
         }
         document.removeEventListener('touchmove', onCardDragMoveTouch);
         document.removeEventListener('touchend', onCardDragEndTouch);
+        document.removeEventListener('touchcancel', onCardDragEndTouch);
     }
 
     // ------------------------------------------------------------------
@@ -518,6 +527,7 @@
     function initCanvasPanZoom() {
         if (!elViewport) return;
 
+        // Desktop Mouse Drag Pan
         elViewport.addEventListener('mousedown', (e) => {
             // Hanya pan jika klik di area kosong viewport (bukan kartu)
             if (e.target.closest('.designer-card') || e.target.closest('.designer-preview-drawer')) return;
@@ -532,7 +542,7 @@
             document.addEventListener('mouseup', onCanvasPanEnd);
         });
 
-        // Wheel Zoom
+        // Desktop Mouse Wheel Zoom
         elViewport.addEventListener('wheel', (e) => {
             if (e.target.closest('.designer-card-columns') || e.target.closest('.designer-preview-body')) return;
             e.preventDefault();
@@ -551,6 +561,80 @@
 
             updateWorldTransform();
         }, { passive: false });
+
+        // ---------------- Sentuhan di HP / Tablet (Touch Pan & Pinch Zoom) ----------------
+        let isTouchPanning = false;
+        let isPinching = false;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let pinchStartDist = 0;
+        let pinchStartScale = 1;
+        let pinchMidX = 0;
+        let pinchMidY = 0;
+        let pinchStartPanX = 0;
+        let pinchStartPanY = 0;
+
+        elViewport.addEventListener('touchstart', (e) => {
+            // Abaikan jika menyentuh kartu atau drawer preview
+            if (e.target.closest('.designer-card') || e.target.closest('.designer-preview-drawer')) return;
+
+            if (e.touches.length === 1) {
+                // Sentuhan 1 jari: Pan / Geser kanvas skema
+                isTouchPanning = true;
+                isPinching = false;
+                const touch = e.touches[0];
+                touchStartX = touch.clientX - panX;
+                touchStartY = touch.clientY - panY;
+                elViewport.classList.add('panning');
+            } else if (e.touches.length === 2) {
+                // Sentuhan 2 jari: Pinch to zoom
+                isTouchPanning = false;
+                isPinching = true;
+                const t1 = e.touches[0];
+                const t2 = e.touches[1];
+                pinchStartDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+                pinchStartScale = scale;
+                pinchStartPanX = panX;
+                pinchStartPanY = panY;
+
+                const rect = elViewport.getBoundingClientRect();
+                pinchMidX = (t1.clientX + t2.clientX) / 2 - rect.left;
+                pinchMidY = (t1.clientY + t2.clientY) / 2 - rect.top;
+            }
+        }, { passive: false });
+
+        elViewport.addEventListener('touchmove', (e) => {
+            if (isTouchPanning && e.touches.length === 1) {
+                if (e.cancelable) e.preventDefault(); // Mencegah scrolling browser
+                const touch = e.touches[0];
+                panX = touch.clientX - touchStartX;
+                panY = touch.clientY - touchStartY;
+                updateWorldTransform();
+            } else if (isPinching && e.touches.length === 2) {
+                if (e.cancelable) e.preventDefault();
+                const t1 = e.touches[0];
+                const t2 = e.touches[1];
+                const currentDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+                if (pinchStartDist > 0) {
+                    const factor = currentDist / pinchStartDist;
+                    const newScale = Math.min(Math.max(pinchStartScale * factor, 0.3), 2.5);
+
+                    panX = pinchMidX - (pinchMidX - pinchStartPanX) * (newScale / pinchStartScale);
+                    panY = pinchMidY - (pinchMidY - pinchStartPanY) * (newScale / pinchStartScale);
+                    scale = newScale;
+                    updateWorldTransform();
+                }
+            }
+        }, { passive: false });
+
+        const onTouchEnd = () => {
+            isTouchPanning = false;
+            isPinching = false;
+            if (elViewport) elViewport.classList.remove('panning');
+        };
+
+        elViewport.addEventListener('touchend', onTouchEnd);
+        elViewport.addEventListener('touchcancel', onTouchEnd);
     }
 
     function onCanvasPanMove(e) {

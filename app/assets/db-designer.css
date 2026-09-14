@@ -193,6 +193,8 @@
     overflow: hidden;
     cursor: grab;
     user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
     background-color: var(--dsg-bg-canvas);
     background-image: 
         radial-gradient(circle, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
@@ -257,6 +259,7 @@
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
     z-index: 10;
     user-select: none;
+    touch-action: none;
     transition: box-shadow 0.15s ease, border-color 0.15s ease, opacity 0.2s ease;
 }
 .designer-card.dragging {
@@ -283,6 +286,9 @@
     border-bottom: 1px solid #2d4566;
     padding: 7px 10px;
     cursor: move;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
 }
 .designer-card-title-wrap {
     display: flex;
@@ -500,17 +506,32 @@
         padding: 6px 10px;
         height: auto;
         flex-wrap: wrap;
+        gap: 6px;
     }
     .designer-search-input {
-        width: 110px;
+        width: 100px;
+        font-size: 12px;
     }
     .designer-search-input:focus {
-        width: 130px;
+        width: 120px;
+    }
+    .designer-btn {
+        padding: 5px 8px;
+        font-size: 12px;
     }
     .designer-btn span.btn-label {
         display: none;
     }
     .designer-card {
         width: 220px;
+        touch-action: none;
+    }
+    .designer-card-header {
+        padding: 9px 12px;
+        min-height: 40px;
+        touch-action: none;
+    }
+    .designer-viewport {
+        touch-action: none;
     }
 }
