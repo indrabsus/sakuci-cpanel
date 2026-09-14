@@ -568,6 +568,12 @@ function salinCadangan(teks, selesai) {
             <div class="designer-controls">
                 <input type="text" class="designer-search-input" placeholder="🔍 Cari tabel…" oninput="window.DB_DESIGNER && window.DB_DESIGNER.filterTables(this.value)">
                 
+                <button type="button" class="designer-btn designer-btn-primary" onclick="window.DB_DESIGNER && window.DB_DESIGNER.openCreateTableModal()" title="Buat Tabel Baru">
+                    ➕ <span class="btn-label">Tabel Baru</span>
+                </button>
+                <button type="button" class="designer-btn" onclick="window.DB_DESIGNER && window.DB_DESIGNER.openAddRelationModal()" title="Hubungkan Relasi Foreign Key">
+                    🔗 <span class="btn-label">Tambah Relasi</span>
+                </button>
                 <button type="button" class="designer-btn" onclick="window.DB_DESIGNER && window.DB_DESIGNER.autoArrange()" title="Tata rapi tabel secara otomatis">
                     🪄 <span class="btn-label">Tata Otomatis</span>
                 </button>
@@ -611,13 +617,217 @@ function salinCadangan(teks, selesai) {
             </div>
         </div>
 
-        <!-- Data Preview Drawer -->
+        <!-- Data Preview & Management Drawer -->
         <div id="designer-preview-drawer" class="designer-preview-drawer">
             <div class="designer-preview-header">
-                <div class="designer-preview-title" id="designer-preview-title">Pratinjau Data</div>
-                <button type="button" class="designer-btn" style="padding:2px 8px" onclick="window.DB_DESIGNER && window.DB_DESIGNER.closePreview()">✕ Tutup</button>
+                <div style="display:flex; align-items:center; gap:8px">
+                    <span style="font-size:16px">📊</span>
+                    <div class="designer-preview-title" id="designer-preview-title">Kelola Data Tabel</div>
+                </div>
+                <div style="display:flex; gap:6px">
+                    <button type="button" class="designer-btn designer-btn-primary" id="btn-drawer-add-row" onclick="window.DB_DESIGNER && window.DB_DESIGNER.openInsertRowModal()">
+                        ➕ Tambah Data
+                    </button>
+                    <button type="button" class="designer-btn" onclick="window.DB_DESIGNER && window.DB_DESIGNER.refreshCurrentTableData()" title="Muat Ulang Data">
+                        🔄
+                    </button>
+                    <button type="button" class="designer-btn" style="padding:2px 8px" onclick="window.DB_DESIGNER && window.DB_DESIGNER.closePreview()">✕ Tutup</button>
+                </div>
             </div>
             <div class="designer-preview-body" id="designer-preview-body"></div>
+        </div>
+
+        <!-- Submodal 1: Buat Tabel Baru ala phpMyAdmin -->
+        <div id="designer-modal-create-table" class="designer-submodal-backdrop">
+            <div class="designer-submodal-card" style="max-width:820px">
+                <div class="designer-submodal-header">
+                    <div style="display:flex; align-items:center; gap:8px">
+                        <span>➕</span>
+                        <span>Buat Tabel Baru</span>
+                    </div>
+                    <button type="button" class="designer-btn designer-btn-sm" onclick="window.DB_DESIGNER.closeSubmodal('create-table')">✕</button>
+                </div>
+                <div class="designer-submodal-body">
+                    <div class="designer-form-group" style="margin-bottom:14px">
+                        <label class="designer-form-label">Nama Tabel: <span style="color:#ef4444">*</span></label>
+                        <input type="text" id="dsg-create-tbl-name" class="designer-input" placeholder="contoh: produk, transaksi, kategori" style="max-width:320px">
+                    </div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+                        <div style="font-size:12.5px; font-weight:600; color:#38bdf8">Struktur Kolom Tabel:</div>
+                        <button type="button" class="designer-btn designer-btn-sm" onclick="window.DB_DESIGNER.appendCreateTableColumnRow()">
+                            + Tambah Baris Kolom
+                        </button>
+                    </div>
+                    <div class="designer-table-scroll">
+                        <table class="designer-input-table">
+                            <thead>
+                                <tr>
+                                    <th style="min-width:140px">Nama Kolom</th>
+                                    <th style="min-width:110px">Tipe Data</th>
+                                    <th style="min-width:70px">Panjang</th>
+                                    <th style="min-width:40px; text-align:center" title="Primary Key">PK</th>
+                                    <th style="min-width:40px; text-align:center" title="Auto Increment">AI</th>
+                                    <th style="min-width:45px; text-align:center" title="Boleh NULL">Null</th>
+                                    <th style="min-width:110px">Default</th>
+                                    <th style="min-width:40px; text-align:center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dsg-create-cols-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="designer-submodal-footer">
+                    <button type="button" class="designer-btn" onclick="window.DB_DESIGNER.closeSubmodal('create-table')">Batal</button>
+                    <button type="button" class="designer-btn designer-btn-primary" onclick="window.DB_DESIGNER.submitCreateTable()">💾 Simpan Tabel Baru</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submodal 2: Tambah Kolom ke Tabel yang Sudah Ada -->
+        <div id="designer-modal-add-column" class="designer-submodal-backdrop">
+            <div class="designer-submodal-card" style="max-width:480px">
+                <div class="designer-submodal-header">
+                    <div style="display:flex; align-items:center; gap:8px">
+                        <span>➕</span>
+                        <span id="dsg-add-col-title">Tambah Kolom</span>
+                    </div>
+                    <button type="button" class="designer-btn designer-btn-sm" onclick="window.DB_DESIGNER.closeSubmodal('add-column')">✕</button>
+                </div>
+                <div class="designer-submodal-body">
+                    <input type="hidden" id="dsg-add-col-target-table" value="">
+                    <div class="designer-form-group">
+                        <label class="designer-form-label">Nama Kolom: <span style="color:#ef4444">*</span></label>
+                        <input type="text" id="dsg-add-col-name" class="designer-input" placeholder="contoh: harga, stok, deskripsi">
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+                        <div class="designer-form-group">
+                            <label class="designer-form-label">Tipe Data:</label>
+                            <select id="dsg-add-col-type" class="designer-select" onchange="window.DB_DESIGNER.onColTypeChange(this.value, 'dsg-add-col-length')">
+                                <option value="VARCHAR">VARCHAR</option>
+                                <option value="INT">INT</option>
+                                <option value="BIGINT">BIGINT</option>
+                                <option value="TEXT">TEXT</option>
+                                <option value="DECIMAL">DECIMAL</option>
+                                <option value="DATE">DATE</option>
+                                <option value="DATETIME">DATETIME</option>
+                                <option value="TIMESTAMP">TIMESTAMP</option>
+                                <option value="BOOLEAN">BOOLEAN</option>
+                                <option value="JSON">JSON</option>
+                            </select>
+                        </div>
+                        <div class="designer-form-group">
+                            <label class="designer-form-label">Panjang / Nilai:</label>
+                            <input type="text" id="dsg-add-col-length" class="designer-input" value="255">
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+                        <div class="designer-form-group">
+                            <label class="designer-form-label">Boleh NULL:</label>
+                            <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-top:6px; color:#e2e8f0; cursor:pointer">
+                                <input type="checkbox" id="dsg-add-col-null" checked> Ya, boleh NULL
+                            </label>
+                        </div>
+                        <div class="designer-form-group">
+                            <label class="designer-form-label">Nilai Default:</label>
+                            <input type="text" id="dsg-add-col-default" class="designer-input" placeholder="NULL, 0, dll">
+                        </div>
+                    </div>
+                    <div class="designer-form-group">
+                        <label class="designer-form-label">Posisi Kolom:</label>
+                        <select id="dsg-add-col-position" class="designer-select">
+                            <option value="AFTER_LAST">Di Akhir Tabel (Bawaan)</option>
+                            <option value="FIRST">Di Awal Tabel (Paling Pertama)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="designer-submodal-footer">
+                    <button type="button" class="designer-btn" onclick="window.DB_DESIGNER.closeSubmodal('add-column')">Batal</button>
+                    <button type="button" class="designer-btn designer-btn-primary" onclick="window.DB_DESIGNER.submitAddColumn()">Simpan Kolom</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submodal 3: Tambah Relasi Foreign Key -->
+        <div id="designer-modal-add-relation" class="designer-submodal-backdrop">
+            <div class="designer-submodal-card" style="max-width:520px">
+                <div class="designer-submodal-header">
+                    <div style="display:flex; align-items:center; gap:8px">
+                        <span>🔗</span>
+                        <span>Hubungkan Relasi Foreign Key</span>
+                    </div>
+                    <button type="button" class="designer-btn designer-btn-sm" onclick="window.DB_DESIGNER.closeSubmodal('add-relation')">✕</button>
+                </div>
+                <div class="designer-submodal-body">
+                    <div style="background:rgba(2,132,199,0.1); border:1px solid rgba(2,132,199,0.3); border-radius:6px; padding:10px; font-size:11.5px; color:#38bdf8; margin-bottom:14px; line-height:1.5">
+                        ℹ️ Hubungkan kolom kunci tamu (Foreign Key) pada tabel anak ke kolom kunci utama (Primary Key) pada tabel induk.
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px">
+                        <div class="designer-form-group">
+                            <label class="designer-form-label">Tabel Asal (Anak / FK):</label>
+                            <select id="dsg-rel-from-table" class="designer-select" onchange="window.DB_DESIGNER.onRelFromTableChange(this.value)"></select>
+                        </div>
+                        <div class="designer-form-group">
+                            <label class="designer-form-label">Kolom Asal (FK):</label>
+                            <select id="dsg-rel-from-col" class="designer-select"></select>
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px">
+                        <div class="designer-form-group">
+                            <label class="designer-form-label">Tabel Referensi (Induk / PK):</label>
+                            <select id="dsg-rel-to-table" class="designer-select" onchange="window.DB_DESIGNER.onRelToTableChange(this.value)"></select>
+                        </div>
+                        <div class="designer-form-group">
+                            <label class="designer-form-label">Kolom Referensi (PK):</label>
+                            <select id="dsg-rel-to-col" class="designer-select"></select>
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+                        <div class="designer-form-group">
+                            <label class="designer-form-label">ON DELETE:</label>
+                            <select id="dsg-rel-on-delete" class="designer-select">
+                                <option value="CASCADE">CASCADE (Hapus anak jika induk dihapus)</option>
+                                <option value="RESTRICT">RESTRICT (Tolak hapus jika masih ada anak)</option>
+                                <option value="SET NULL">SET NULL (Ubah FK jadi NULL)</option>
+                                <option value="NO ACTION">NO ACTION</option>
+                            </select>
+                        </div>
+                        <div class="designer-form-group">
+                            <label class="designer-form-label">ON UPDATE:</label>
+                            <select id="dsg-rel-on-update" class="designer-select">
+                                <option value="CASCADE">CASCADE (Ikut update anak)</option>
+                                <option value="RESTRICT">RESTRICT</option>
+                                <option value="SET NULL">SET NULL</option>
+                                <option value="NO ACTION">NO ACTION</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="designer-submodal-footer">
+                    <button type="button" class="designer-btn" onclick="window.DB_DESIGNER.closeSubmodal('add-relation')">Batal</button>
+                    <button type="button" class="designer-btn designer-btn-primary" onclick="window.DB_DESIGNER.submitAddRelation()">🔗 Hubungkan Relasi</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submodal 4: Input Baris Data Baru (Insert Row) -->
+        <div id="designer-modal-insert-row" class="designer-submodal-backdrop">
+            <div class="designer-submodal-card" style="max-width:560px">
+                <div class="designer-submodal-header">
+                    <div style="display:flex; align-items:center; gap:8px">
+                        <span>➕</span>
+                        <span id="dsg-insert-title">Tambah Data Baris</span>
+                    </div>
+                    <button type="button" class="designer-btn designer-btn-sm" onclick="window.DB_DESIGNER.closeSubmodal('insert-row')">✕</button>
+                </div>
+                <div class="designer-submodal-body">
+                    <input type="hidden" id="dsg-insert-table-name" value="">
+                    <div id="dsg-insert-fields-wrap" style="display:flex; flex-direction:column; gap:10px"></div>
+                </div>
+                <div class="designer-submodal-footer">
+                    <button type="button" class="designer-btn" onclick="window.DB_DESIGNER.closeSubmodal('insert-row')">Batal</button>
+                    <button type="button" class="designer-btn designer-btn-primary" onclick="window.DB_DESIGNER.submitInsertRow()">💾 Simpan Data</button>
+                </div>
+            </div>
         </div>
     </div>
 </div>
