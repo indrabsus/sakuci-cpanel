@@ -363,3 +363,14 @@
         text-align: center;
     }
 }
+
+
+.git-btn-file {
+    color: #38bdf8 !important;
+    border-color: rgba(56, 189, 248, 0.35) !important;
+}
+.git-btn-file:hover:not(:disabled) {
+    background: rgba(56, 189, 248, 0.12) !important;
+    border-color: #38bdf8 !important;
+    color: #7dd3fc !important;
+}

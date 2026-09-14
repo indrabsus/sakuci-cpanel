@@ -386,7 +386,10 @@ layout_start(
                             <a class="git-btn git-btn-open" target="_blank" rel="noopener noreferrer"
                                href="<?php echo htmlspecialchars($url); ?>">Buka Web</a>
                         <?php endif; ?>
-                        <a class="git-btn git-btn-file" href="files.php?project=<?php echo $project['id']; ?>">Berkas</a>
+                        <a class="git-btn git-btn-file" href="files.php?project=<?php echo $project['id']; ?>" title="Buka Code Editor">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                            <span>Editor</span>
+                        </a>
                         <button class="git-btn git-btn-danger" data-action="delete"
                                 data-name="<?php echo htmlspecialchars($project['name'], ENT_QUOTES); ?>">Hapus</button>
                     </div>
