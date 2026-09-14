@@ -4,12 +4,15 @@
  * Fitur:
  * - Draggable Table Cards (Touch & Mouse)
  * - Real-time SVG Curve Relations & Interactive FK Deletion
+ * - Touch Hitbox 28px for accurate mobile tapping on relations
+ * - Compatibility Checker & Auto-Align Types for Foreign Keys
+ * - Dedicated Manage Relations Modal (Daftar & Hapus FK)
+ * - Toggle Inferred Relations (On/Off)
  * - Pan & Zoom (Mouse drag, wheel, touch pan & pinch zoom)
  * - Auto-Arrange & Smart Grid
  * - Visual Table Creator (Create Table with columns builder)
  * - Drop Table with safe confirmation
  * - Add Column & Drop Column
- * - Create Foreign Key & Drop Foreign Key
  * - Data CRUD Drawer (Preview, Insert New Row, Delete Row)
  */
 
@@ -124,14 +127,16 @@
             }
 
             schemaData = data;
+            const explicitCount = (data.relations || []).filter(r => r.type === 'explicit').length;
+            const inferredCount = (data.relations || []).filter(r => r.type === 'inferred').length;
+
             if (metaEl) {
-                metaEl.textContent = `${data.tables_count || (data.tables ? data.tables.length : 0)} tabel • ${data.relations_count || (data.relations ? data.relations.length : 0)} relasi`;
+                metaEl.textContent = `${data.tables_count || (data.tables ? data.tables.length : 0)} tabel • ${explicitCount} FK resmi • ${inferredCount} relasi otomatis`;
             }
 
             if (!preservePositions || Object.keys(cardPositions).length === 0) {
                 autoArrangePositions();
             } else {
-                // Pertahankan posisi lama, tambahkan posisi baru untuk tabel yang baru dibuat
                 const cardWidth = 250;
                 const gapX = 70;
                 const gapY = 50;
@@ -140,7 +145,6 @@
 
                 (schemaData.tables || []).forEach(t => {
                     if (!cardPositions[t.name]) {
-                        // Cari posisi kosong
                         cardPositions[t.name] = { x: nextX, y: nextY };
                         nextX += cardWidth + gapX;
                         if (nextX > 900) {
@@ -153,6 +157,12 @@
 
             renderTables();
             renderRelations();
+
+            // Refresh modal daftar relasi jika sedang terbuka
+            const manageModal = document.getElementById('designer-modal-manage-relations');
+            if (manageModal && manageModal.classList.contains('show')) {
+                renderManageRelationsContent();
+            }
 
         } catch (err) {
             console.error('Designer Error:', err);
@@ -236,7 +246,6 @@
 
             const rowsCountStr = `${t.rows} baris`;
 
-            // HTML Header Kartu dengan Aksi: Tambah Kolom, Kelola Data, Hapus Tabel
             let cardHtml = `
                 <div class="designer-card-header" data-card-header="${escapeHtml(t.name)}">
                     <div class="designer-card-title-wrap">
@@ -259,18 +268,19 @@
                 <div class="designer-card-columns">
             `;
 
-            // Render Daftar Kolom
             t.columns.forEach(col => {
                 let keyBadge = '<span class="designer-col-key"></span>';
+                const hasFk = isForeignKeyColumn(t.name, col.name);
+
                 if (col.is_pk) {
                     keyBadge = '<span class="designer-col-key" title="Primary Key">🔑</span>';
-                } else if (isForeignKeyColumn(t.name, col.name)) {
-                    keyBadge = '<span class="designer-col-key" title="Foreign Key">🔗</span>';
+                } else if (hasFk) {
+                    keyBadge = `<span class="designer-col-key" title="Foreign Key (Klik untuk kelola/hapus)" style="cursor:pointer" onclick="event.stopPropagation(); window.DB_DESIGNER.onColFkClick('${escapeHtml(t.name)}', '${escapeHtml(col.name)}')">🔗</span>`;
                 } else if (col.is_unique) {
                     keyBadge = '<span class="designer-col-key" title="Unique">✨</span>';
                 }
 
-                const pkClass = col.is_pk ? 'is-pk' : (isForeignKeyColumn(t.name, col.name) ? 'is-fk' : '');
+                const pkClass = col.is_pk ? 'is-pk' : (hasFk ? 'is-fk' : '');
                 const nullStr = col.null ? '<span class="designer-col-null" title="Nullable">NULL</span>' : '';
 
                 cardHtml += `
@@ -289,8 +299,6 @@
             });
 
             cardHtml += `</div>`;
-
-            // Footer Kartu: Tombol Cepat Tambah Kolom
             cardHtml += `
                 <div class="designer-card-footer">
                     <button type="button" class="designer-card-add-col-btn" onclick="window.DB_DESIGNER.openAddColumnModal('${escapeHtml(t.name)}')">
@@ -302,7 +310,6 @@
             card.innerHTML = cardHtml;
             elCardsLayer.appendChild(card);
 
-            // Pasang event listener drag pada header kartu
             const header = card.querySelector('.designer-card-header');
             if (header) {
                 header.addEventListener('mousedown', (e) => startCardDrag(e, card));
@@ -320,7 +327,19 @@
     }
 
     /**
-     * Render SVG Bezier Relation Lines
+     * Aksi klik pada ikon 🔗 di kolom kartu tabel
+     */
+    function onColFkClick(tableName, colName) {
+        const rel = (schemaData.relations || []).find(r => r.from_table === tableName && r.from_column === colName);
+        if (rel) {
+            onRelationClick(rel);
+        } else {
+            openAddRelationModal(tableName, colName);
+        }
+    }
+
+    /**
+     * Render SVG Bezier Relation Lines dengan Hitbox 28px untuk sentuhan HP yang presisi
      */
     function renderRelations() {
         if (!elSvgCanvas) return;
@@ -348,6 +367,18 @@
             const toCard = document.getElementById(`designer-card-${rel.to_table}`);
             if (!fromCard || !toCard) return;
 
+            // 1. Invisible wide hit area for easy click/touch on smartphone screens
+            const hitArea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            hitArea.id = `rel-hit-${rel.id}`;
+            hitArea.classList.add('designer-relation-hitarea');
+            hitArea.dataset.relType = rel.type;
+            hitArea.setAttribute('stroke', 'transparent');
+            hitArea.setAttribute('stroke-width', '28');
+            hitArea.setAttribute('fill', 'none');
+            hitArea.style.pointerEvents = 'stroke';
+            hitArea.style.cursor = 'pointer';
+
+            // 2. Visible styled relation curve
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.id = `rel-${rel.id}`;
             path.classList.add('designer-relation-line', rel.type);
@@ -359,19 +390,25 @@
             path.dataset.label = rel.label || '';
 
             const titleEl = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-            titleEl.textContent = `${rel.from_table}.${rel.from_column} → ${rel.to_table}.${rel.to_column} (${rel.type === 'explicit' ? 'Foreign Key: ' + (rel.constraint_name || rel.label) + ' • Klik untuk menghapus relasi' : 'Relasi Konvensi • Klik untuk buat Foreign Key resmi'})`;
+            titleEl.textContent = `${rel.from_table}.${rel.from_column} → ${rel.to_table}.${rel.to_column} (${rel.type === 'explicit' ? 'Foreign Key: ' + (rel.constraint_name || rel.label) + ' • Klik untuk hapus' : 'Relasi Konvensi (Otomatis) • Klik untuk buat FK resmi'})`;
             path.appendChild(titleEl);
 
-            // Hover highlight
-            path.addEventListener('mouseenter', () => highlightRelation(rel, true));
-            path.addEventListener('mouseleave', () => highlightRelation(rel, false));
+            // Hover effects
+            const setHighlight = (hover) => highlightRelation(rel, hover);
+            hitArea.addEventListener('mouseenter', () => setHighlight(true));
+            hitArea.addEventListener('mouseleave', () => setHighlight(false));
+            path.addEventListener('mouseenter', () => setHighlight(true));
+            path.addEventListener('mouseleave', () => setHighlight(false));
 
-            // Interaksi klik relasi (Hapus FK atau jadikan FK resmi)
-            path.addEventListener('click', (e) => {
+            // Click / Tap on either hitArea or path
+            const handleClick = (e) => {
                 e.stopPropagation();
                 onRelationClick(rel);
-            });
+            };
+            hitArea.addEventListener('click', handleClick);
+            path.addEventListener('click', handleClick);
 
+            elSvgCanvas.appendChild(hitArea);
             elSvgCanvas.appendChild(path);
         });
 
@@ -379,17 +416,26 @@
     }
 
     /**
-     * Aksi klik pada garis kurva relasi
+     * Aksi klik pada garis relasi
      */
     function onRelationClick(rel) {
         if (rel.type === 'explicit') {
             const cName = rel.constraint_name || rel.label;
-            const msg = `Relasi Foreign Key Eksplisit:\nConstraint: ${cName}\n${rel.from_table}.${rel.from_column} ➔ ${rel.to_table}.${rel.to_column}\n\nApakah Anda ingin MENGHAPUS batasan Foreign Key ini dari database?`;
+            const delRule = rel.on_delete ? ` • ON DELETE ${rel.on_delete}` : '';
+            const msg = `🔗 RELASI FOREIGN KEY (InnoDB):\n\n` +
+                `Hubungan: ${rel.from_table}.${rel.from_column} ➔ ${rel.to_table}.${rel.to_column}\n` +
+                `Constraint: ${cName}${delRule}\n\n` +
+                `Apakah Anda ingin MENGHAPUS batasan Foreign Key ini dari database MySQL?`;
             if (confirm(msg)) {
                 dropForeignKey(rel.from_table, cName);
             }
         } else {
-            const msg = `Relasi Konvensi Terdeteksi:\n${rel.from_table}.${rel.from_column} ➔ ${rel.to_table}.${rel.to_column}\n\nKolom ini terdeteksi memiliki relasi berdasarkan nama, tetapi belum ada batasan Foreign Key resmi di MySQL.\n\nApakah Anda ingin membuat batasan Foreign Key resmi untuk relasi ini sekarang?`;
+            const msg = `🔍 RELASI KONVENSI (Deteksi Otomatis):\n\n` +
+                `Hubungan: ${rel.from_table}.${rel.from_column} ➔ ${rel.to_table}.${rel.to_column}\n\n` +
+                `ℹ️ CATATAN PENTING:\n` +
+                `Garis putus-putus oranye ini BUKAN Foreign Key di MySQL, melainkan prediksi sistem karena nama kolom berakhiran '_id'.\n\n` +
+                `• Klik OK untuk membuat Foreign Key resmi di MySQL sekarang.\n` +
+                `• Klik Batal untuk menutup dialog ini.`;
             if (confirm(msg)) {
                 openAddRelationModal(rel.from_table, rel.from_column, rel.to_table, rel.to_column);
             }
@@ -405,6 +451,7 @@
 
         relations.forEach(rel => {
             const path = document.getElementById(`rel-${rel.id}`);
+            const hitArea = document.getElementById(`rel-hit-${rel.id}`);
             if (!path) return;
 
             const fromCard = document.getElementById(`designer-card-${rel.from_table}`);
@@ -447,6 +494,7 @@
 
             const d = `M ${x1} ${y1} C ${c1x} ${y1}, ${c2x} ${y2}, ${x2} ${y2}`;
             path.setAttribute('d', d);
+            if (hitArea) hitArea.setAttribute('d', d);
         });
     }
 
@@ -478,6 +526,19 @@
                 path.classList.remove('highlight');
                 path.setAttribute('marker-end', `url(#marker-${rel.type})`);
             }
+        }
+    }
+
+    /**
+     * Toggle sembunyikan/tampilkan garis relasi konvensi (inferred)
+     */
+    function toggleInferredRelations(show) {
+        const viewport = document.getElementById('designer-viewport');
+        if (!viewport) return;
+        if (show) {
+            viewport.classList.remove('hide-inferred');
+        } else {
+            viewport.classList.add('hide-inferred');
         }
     }
 
@@ -789,9 +850,6 @@
         document.querySelectorAll('.designer-submodal-backdrop').forEach(m => m.classList.remove('show'));
     }
 
-    /**
-     * Otomatisasi pengaturan panjang default saat tipe data berubah
-     */
     function onColTypeChange(val, lengthTarget) {
         const lenEl = typeof lengthTarget === 'string' ? document.getElementById(lengthTarget) : lengthTarget;
         if (!lenEl) return;
@@ -819,7 +877,6 @@
         if (nameInput) nameInput.value = '';
         if (bodyEl) bodyEl.innerHTML = '';
 
-        // Default 3 baris standar (id, nama, created_at)
         appendCreateTableColumnRow({ name: 'id', type: 'INT', length: '11', is_pk: true, is_ai: true, null: false, default: '' });
         appendCreateTableColumnRow({ name: 'nama', type: 'VARCHAR', length: '255', is_pk: false, is_ai: false, null: false, default: '' });
         appendCreateTableColumnRow({ name: 'created_at', type: 'TIMESTAMP', length: '', is_pk: false, is_ai: false, null: false, default: 'CURRENT_TIMESTAMP' });
@@ -962,7 +1019,6 @@
             closeSubmodal('create-table');
             await reloadSchema(true);
 
-            // Sorot tabel yang baru dibuat
             setTimeout(() => {
                 const card = document.getElementById(`designer-card-${tableName}`);
                 if (card) {
@@ -1039,7 +1095,6 @@
         if (nullCheck) nullCheck.checked = true;
         if (defInput) defInput.value = '';
 
-        // Bangun opsi posisi kolom (FIRST, AFTER last, atau AFTER kolom tertentu)
         if (posSelect) {
             let posHtml = `
                 <option value="AFTER_LAST">Di Akhir Tabel (Bawaan)</option>
@@ -1158,8 +1213,65 @@
     }
 
     // ------------------------------------------------------------------
-    // FITUR 5: RELASI FOREIGN KEY (TAMBAH & HAPUS)
+    // FITUR 5: RELASI FOREIGN KEY (TAMBAH, VALIDASI TIPE & HAPUS)
     // ------------------------------------------------------------------
+    function getColumnMeta(tableName, colName) {
+        const t = (schemaData.tables || []).find(tbl => tbl.name === tableName);
+        if (!t || !t.columns) return null;
+        return t.columns.find(c => c.name === colName) || null;
+    }
+
+    function checkRelationCompatibility() {
+        const fromTbl = document.getElementById('dsg-rel-from-table')?.value;
+        const fromCol = document.getElementById('dsg-rel-from-col')?.value;
+        const toTbl   = document.getElementById('dsg-rel-to-table')?.value;
+        const toCol   = document.getElementById('dsg-rel-to-col')?.value;
+        const compatBox = document.getElementById('dsg-rel-compat-box');
+        const autoAlignWrap = document.getElementById('dsg-rel-autoalign-wrap');
+        const autoAlignCheck = document.getElementById('dsg-rel-auto-align');
+
+        if (!compatBox || !fromTbl || !fromCol || !toTbl || !toCol) {
+            if (compatBox) compatBox.style.display = 'none';
+            if (autoAlignWrap) autoAlignWrap.style.display = 'none';
+            return;
+        }
+
+        const fromMeta = getColumnMeta(fromTbl, fromCol);
+        const toMeta   = getColumnMeta(toTbl, toCol);
+
+        if (!fromMeta || !toMeta) {
+            compatBox.style.display = 'none';
+            if (autoAlignWrap) autoAlignWrap.style.display = 'none';
+            return;
+        }
+
+        const fromType = (fromMeta.type || '').toLowerCase();
+        const toType   = (toMeta.type || '').toLowerCase();
+        const isExactMatch = (fromType === toType);
+
+        compatBox.style.display = 'block';
+
+        if (isExactMatch) {
+            compatBox.className = 'designer-rel-compat-box compatible';
+            compatBox.innerHTML = `
+                <div style="font-weight:600; margin-bottom:2px">✓ Tipe Data Kompatibel</div>
+                <div>Kedua kolom bertipe <strong>${escapeHtml(toType)}</strong>. Siap dihubungkan sebagai Foreign Key!</div>
+            `;
+            if (autoAlignWrap) autoAlignWrap.style.display = 'none';
+        } else {
+            compatBox.className = 'designer-rel-compat-box incompatible';
+            compatBox.innerHTML = `
+                <div style="font-weight:600; margin-bottom:2px">⚠️ Peringatan: Tipe Data Tidak Sama!</div>
+                <div>Kolom asal bertipe <strong>${escapeHtml(fromType)}</strong> sedangkan kolom referensi bertipe <strong>${escapeHtml(toType)}</strong>.</div>
+                <div style="font-size:11.5px; margin-top:4px; opacity:0.9">MySQL mewajibkan tipe data dan unsigned sama persis agar tidak muncul error <em>"are incompatible"</em>.</div>
+            `;
+            if (autoAlignWrap) {
+                autoAlignWrap.style.display = 'block';
+                if (autoAlignCheck) autoAlignCheck.checked = true;
+            }
+        }
+    }
+
     function openAddRelationModal(defaultFromTable, defaultFromCol, defaultToTable, defaultToCol) {
         const tables = schemaData.tables || [];
         if (tables.length < 2) {
@@ -1169,6 +1281,8 @@
 
         const fromTableSel = document.getElementById('dsg-rel-from-table');
         const toTableSel = document.getElementById('dsg-rel-to-table');
+        const fromColSel = document.getElementById('dsg-rel-from-col');
+        const toColSel = document.getElementById('dsg-rel-to-col');
 
         if (!fromTableSel || !toTableSel) return;
 
@@ -1189,6 +1303,10 @@
         onRelFromTableChange(selFrom, defaultFromCol);
         onRelToTableChange(selTo, defaultToCol);
 
+        if (fromColSel) fromColSel.onchange = checkRelationCompatibility;
+        if (toColSel) toColSel.onchange = checkRelationCompatibility;
+
+        checkRelationCompatibility();
         openSubmodal('add-relation');
     }
 
@@ -1199,6 +1317,7 @@
         const tableObj = (schemaData.tables || []).find(t => t.name === tableName);
         if (!tableObj) {
             colSel.innerHTML = '';
+            checkRelationCompatibility();
             return;
         }
 
@@ -1209,6 +1328,7 @@
         colSel.innerHTML = html;
 
         if (defaultCol) colSel.value = defaultCol;
+        checkRelationCompatibility();
     }
 
     function onRelToTableChange(tableName, defaultCol) {
@@ -1218,10 +1338,10 @@
         const tableObj = (schemaData.tables || []).find(t => t.name === tableName);
         if (!tableObj) {
             colSel.innerHTML = '';
+            checkRelationCompatibility();
             return;
         }
 
-        // Urutkan Primary Key di urutan paling pertama agar memudahkan siswa
         const colsSorted = [...tableObj.columns].sort((a, b) => (b.is_pk ? 1 : 0) - (a.is_pk ? 1 : 0));
 
         let html = '';
@@ -1232,6 +1352,7 @@
         colSel.innerHTML = html;
 
         if (defaultCol) colSel.value = defaultCol;
+        checkRelationCompatibility();
     }
 
     async function submitAddRelation() {
@@ -1243,6 +1364,8 @@
         const toCol = document.getElementById('dsg-rel-to-col')?.value;
         const onDelete = document.getElementById('dsg-rel-on-delete')?.value || 'CASCADE';
         const onUpdate = document.getElementById('dsg-rel-on-update')?.value || 'CASCADE';
+        const autoAlignCheck = document.getElementById('dsg-rel-auto-align');
+        const autoAlignVal = autoAlignCheck ? (autoAlignCheck.checked ? '1' : '0') : '1';
 
         if (!fromTable || !fromCol || !toTable || !toCol) {
             alert('Pastikan semua tabel dan kolom relasi telah dipilih.');
@@ -1263,6 +1386,7 @@
         fd.append('to_column', toCol);
         fd.append('on_delete', onDelete);
         fd.append('on_update', onUpdate);
+        fd.append('auto_align', autoAlignVal);
 
         try {
             const res = await fetch('api/db-designer.php', {
@@ -1277,6 +1401,10 @@
                 return;
             }
 
+            if (data.pesan) {
+                alert(data.pesan);
+            }
+
             closeSubmodal('add-relation');
             await reloadSchema(true);
 
@@ -1287,6 +1415,10 @@
 
     async function dropForeignKey(tableName, constraintName) {
         if (!activeDbId || !tableName || !constraintName) return;
+
+        if (!confirm(`Apakah Anda yakin ingin MENGHAPUS relasi Foreign Key '${constraintName}' dari tabel '${tableName}'?`)) {
+            return;
+        }
 
         const fd = new FormData();
         fd.append('db_id', activeDbId);
@@ -1307,11 +1439,96 @@
                 return;
             }
 
+            alert(data.pesan || 'Relasi Foreign Key berhasil dihapus!');
             await reloadSchema(true);
 
         } catch (err) {
             alert('Kesalahan: ' + err.message);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // MODAL DAFTAR & KELOLA SELURUH RELASI (MANAGE RELATIONS)
+    // ------------------------------------------------------------------
+    function openManageRelationsModal() {
+        renderManageRelationsContent();
+        openSubmodal('manage-relations');
+    }
+
+    function renderManageRelationsContent() {
+        const wrap = document.getElementById('dsg-manage-relations-wrap');
+        if (!wrap) return;
+
+        const relations = schemaData.relations || [];
+
+        if (relations.length === 0) {
+            wrap.innerHTML = `
+                <div style="padding:32px; text-align:center; color:#94a3b8">
+                    <div style="font-size:28px; margin-bottom:8px">📭</div>
+                    <div style="font-size:13.5px; font-weight:600; color:#f8fafc">Belum Ada Relasi Terdeteksi</div>
+                    <div style="font-size:12px; margin-top:4px">Klik tombol "➕ Tambah Relasi Baru" di atas untuk menghubungkan tabel.</div>
+                </div>
+            `;
+            return;
+        }
+
+        let html = `
+            <table class="designer-input-table">
+                <thead>
+                    <tr>
+                        <th style="min-width:140px">Tabel &amp; Kolom Asal (FK)</th>
+                        <th style="min-width:30px; text-align:center">➔</th>
+                        <th style="min-width:140px">Tabel &amp; Kolom Induk (PK)</th>
+                        <th style="min-width:140px">Jenis Relasi</th>
+                        <th style="min-width:110px; text-align:center">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        relations.forEach(rel => {
+            const isExplicit = (rel.type === 'explicit');
+            const badgeClass = isExplicit ? 'dsg-badge-fk-explicit' : 'dsg-badge-fk-inferred';
+            const badgeText = isExplicit ? `🟢 InnoDB FK (${escapeHtml(rel.constraint_name || rel.label)})` : `🟠 Konvensi Otomatis`;
+            const rules = isExplicit 
+                ? `<div style="font-size:10.5px; color:#94a3b8; margin-top:3px">ON DELETE ${escapeHtml(rel.on_delete || 'CASCADE')} &bull; ON UPDATE ${escapeHtml(rel.on_update || 'CASCADE')}</div>`
+                : `<div style="font-size:10.5px; color:#f97316; margin-top:3px">Prediksi nama kolom, belum ada batasan MySQL</div>`;
+
+            html += `
+                <tr>
+                    <td>
+                        <span style="font-weight:600; color:#38bdf8">${escapeHtml(rel.from_table)}</span>.<span style="color:#f8fafc">${escapeHtml(rel.from_column)}</span>
+                    </td>
+                    <td style="text-align:center; color:#64748b">➔</td>
+                    <td>
+                        <span style="font-weight:600; color:#10b981">${escapeHtml(rel.to_table)}</span>.<span style="color:#f8fafc">${escapeHtml(rel.to_column)}</span>
+                    </td>
+                    <td>
+                        <span class="${badgeClass}">${badgeText}</span>
+                        ${rules}
+                    </td>
+                    <td style="text-align:center">
+            `;
+
+            if (isExplicit) {
+                html += `
+                    <button type="button" class="designer-card-btn-danger" style="padding:4px 9px; font-size:11.5px" onclick="window.DB_DESIGNER.dropForeignKey('${escapeHtml(rel.from_table)}', '${escapeHtml(rel.constraint_name || rel.label)}')">
+                        🗑️ Hapus FK
+                    </button>
+                `;
+            } else {
+                html += `
+                    <button type="button" class="designer-btn designer-btn-primary designer-btn-sm" style="padding:3px 8px; font-size:11px" onclick="window.DB_DESIGNER.closeSubmodal('manage-relations'); window.DB_DESIGNER.openAddRelationModal('${escapeHtml(rel.from_table)}', '${escapeHtml(rel.from_column)}', '${escapeHtml(rel.to_table)}', '${escapeHtml(rel.to_column)}')">
+                        ➕ Buat FK
+                    </button>
+                `;
+            }
+
+            html += `</td></tr>`;
+        });
+
+        html += `</tbody></table>`;
+        wrap.innerHTML = html;
     }
 
     // ------------------------------------------------------------------
@@ -1347,7 +1564,6 @@
                 titleEl.textContent = `Tabel: ${tableName} (${data.total_rows} total baris, menampilkan maks 50 baris)`;
             }
 
-            // Update badge di kartu tabel jika berubah
             const badgeEl = document.getElementById(`card-badge-${tableName}`);
             if (badgeEl) badgeEl.textContent = `${data.total_rows} baris`;
 
@@ -1378,12 +1594,10 @@
             tableHtml += `</tr></thead><tbody>`;
 
             data.rows.forEach(r => {
-                // Siapkan kunci identitas baris untuk penghapusan
                 const pkObj = {};
                 if (pks.length > 0) {
                     pks.forEach(k => pkObj[k] = r[k]);
                 } else {
-                    // Jika tabel tidak punya PK, gunakan seluruh nilai kolom sebagai filter
                     data.columns.forEach(c => pkObj[c] = r[c]);
                 }
                 const pkJson = escapeHtml(JSON.stringify(pkObj));
@@ -1603,8 +1817,12 @@
         openAddRelationModal,
         onRelFromTableChange,
         onRelToTableChange,
+        checkRelationCompatibility,
         submitAddRelation,
         dropForeignKey,
+        openManageRelationsModal,
+        onColFkClick,
+        toggleInferredRelations,
         openInsertRowModal,
         submitInsertRow,
         deleteTableRow,

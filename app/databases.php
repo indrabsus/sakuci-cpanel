@@ -574,6 +574,9 @@ function salinCadangan(teks, selesai) {
                 <button type="button" class="designer-btn" onclick="window.DB_DESIGNER && window.DB_DESIGNER.openAddRelationModal()" title="Hubungkan Relasi Foreign Key">
                     🔗 <span class="btn-label">Tambah Relasi</span>
                 </button>
+                <button type="button" class="designer-btn" onclick="window.DB_DESIGNER && window.DB_DESIGNER.openManageRelationsModal()" title="Lihat dan kelola seluruh relasi tabel">
+                    📋 <span class="btn-label">Kelola Relasi</span>
+                </button>
                 <button type="button" class="designer-btn" onclick="window.DB_DESIGNER && window.DB_DESIGNER.autoArrange()" title="Tata rapi tabel secara otomatis">
                     🪄 <span class="btn-label">Tata Otomatis</span>
                 </button>
@@ -603,7 +606,10 @@ function salinCadangan(teks, selesai) {
             <span class="designer-legend-item">🔗 Foreign Key</span>
             <span class="designer-legend-item"><span class="legend-line-solid"></span> Relasi Eksplisit (InnoDB FK)</span>
             <span class="designer-legend-item"><span class="legend-line-dashed"></span> Relasi Konvensi (Inferred)</span>
-            <span class="designer-legend-item" style="margin-left:auto; opacity:0.8">💡 Tarik header tabel untuk menggeser &middot; Scroll kanvas untuk zoom &middot; Klik 👁️ untuk data</span>
+            <label class="designer-legend-toggle" title="Tampilkan atau sembunyikan garis relasi otomatis (konvensi)" style="margin-left:auto; display:flex; align-items:center; gap:6px; font-size:11.5px; color:#cbd5e1; cursor:pointer; user-select:none">
+                <input type="checkbox" id="dsg-toggle-inferred" checked onchange="window.DB_DESIGNER && window.DB_DESIGNER.toggleInferredRelations(this.checked)">
+                <span>Tampilkan Relasi Konvensi</span>
+            </label>
         </div>
 
         <!-- Canvas Viewport -->
@@ -801,6 +807,15 @@ function salinCadangan(teks, selesai) {
                             </select>
                         </div>
                     </div>
+
+                    <!-- Kotak Status Kompatibilitas Tipe Data -->
+                    <div id="dsg-rel-compat-box" style="margin-top:14px; padding:10px 12px; border-radius:6px; font-size:12px; display:none;"></div>
+                    <div id="dsg-rel-autoalign-wrap" style="margin-top:8px; display:none;">
+                        <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#e2e8f0; cursor:pointer">
+                            <input type="checkbox" id="dsg-rel-auto-align" checked>
+                            <span>Otomatis samakan tipe data kolom asal agar cocok (Cegah error incompatible)</span>
+                        </label>
+                    </div>
                 </div>
                 <div class="designer-submodal-footer">
                     <button type="button" class="designer-btn" onclick="window.DB_DESIGNER.closeSubmodal('add-relation')">Batal</button>
@@ -826,6 +841,34 @@ function salinCadangan(teks, selesai) {
                 <div class="designer-submodal-footer">
                     <button type="button" class="designer-btn" onclick="window.DB_DESIGNER.closeSubmodal('insert-row')">Batal</button>
                     <button type="button" class="designer-btn designer-btn-primary" onclick="window.DB_DESIGNER.submitInsertRow()">💾 Simpan Data</button>
+                </div>
+            </div>
+        </div>
+        <!-- Submodal 5: Kelola Seluruh Relasi Database -->
+        <div id="designer-modal-manage-relations" class="designer-submodal-backdrop">
+            <div class="designer-submodal-card" style="max-width:760px">
+                <div class="designer-submodal-header">
+                    <div style="display:flex; align-items:center; gap:8px">
+                        <span>🔗</span>
+                        <span>Daftar &amp; Kelola Relasi Database</span>
+                    </div>
+                    <button type="button" class="designer-btn designer-btn-sm" onclick="window.DB_DESIGNER.closeSubmodal('manage-relations')">✕</button>
+                </div>
+                <div class="designer-submodal-body">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px">
+                        <div style="font-size:12px; color:#94a3b8">
+                            Daftar relasi Foreign Key (InnoDB) dan relasi konvensi otomatis dalam database ini.
+                        </div>
+                        <button type="button" class="designer-btn designer-btn-primary designer-btn-sm" onclick="window.DB_DESIGNER.closeSubmodal('manage-relations'); window.DB_DESIGNER.openAddRelationModal()">
+                            ➕ Tambah Relasi Baru
+                        </button>
+                    </div>
+                    <div id="dsg-manage-relations-wrap" class="designer-table-scroll" style="max-height:360px">
+                        <!-- Diisi dinamis oleh DB_DESIGNER.renderManageRelationsList() -->
+                    </div>
+                </div>
+                <div class="designer-submodal-footer">
+                    <button type="button" class="designer-btn" onclick="window.DB_DESIGNER.closeSubmodal('manage-relations')">Tutup</button>
                 </div>
             </div>
         </div>

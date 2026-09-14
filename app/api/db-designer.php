@@ -460,6 +460,7 @@ try {
         $toCol     = trim($_POST['to_column'] ?? '');
         $onDelete  = strtoupper(trim($_POST['on_delete'] ?? 'CASCADE'));
         $onUpdate  = strtoupper(trim($_POST['on_update'] ?? 'CASCADE'));
+        $autoAlign = !isset($_POST['auto_align']) || $_POST['auto_align'] === '1' || $_POST['auto_align'] === 'true';
 
         $allowedActions = ['CASCADE', 'SET NULL', 'RESTRICT', 'NO ACTION'];
         if (!in_array($onDelete, $allowedActions, true)) $onDelete = 'CASCADE';
@@ -470,16 +471,53 @@ try {
             exit;
         }
 
-        $fkName = "fk_" . substr($fromTable, 0, 18) . "_" . substr($fromCol, 0, 18) . "_" . substr(md5(uniqid('', true)), 0, 6);
+        // Ambil info kolom toTable (induk) dan fromTable (anak)
+        $toColRes = $dbConn->query("SHOW FULL COLUMNS FROM `{$toTable}` WHERE Field = '" . $dbConn->real_escape_string($toCol) . "'");
+        $toColMeta = $toColRes ? $toColRes->fetch_assoc() : null;
 
-        $sql = "ALTER TABLE `{$fromTable}` ADD CONSTRAINT `{$fkName}` FOREIGN KEY (`{$fromCol}`) REFERENCES `{$toTable}`(`{$toCol}`) ON DELETE {$onDelete} ON UPDATE {$onUpdate}";
-        if (!$dbConn->query($sql)) {
-            echo json_encode(['ok' => false, 'error' => 'Gagal membuat Foreign Key: ' . $dbConn->error . ' (Pastikan kedua kolom memiliki tipe data & ukuran yang sama persis, dan tabel tujuan memiliki index/Primary Key pada kolom referensi).']);
+        $fromColRes = $dbConn->query("SHOW FULL COLUMNS FROM `{$fromTable}` WHERE Field = '" . $dbConn->real_escape_string($fromCol) . "'");
+        $fromColMeta = $fromColRes ? $fromColRes->fetch_assoc() : null;
+
+        if (!$toColMeta || !$fromColMeta) {
+            echo json_encode(['ok' => false, 'error' => 'Kolom asal atau kolom referensi tidak ditemukan di tabel.']);
             exit;
         }
 
-        echo json_encode(['ok' => true, 'pesan' => "Relasi FK '{$fromTable}.{$fromCol} -> {$toTable}.{$toCol}' berhasil dibuat!", 'constraint_name' => $fkName]);
-        exit;
+        $alignedMsg = "";
+        if ($autoAlign && strtolower($fromColMeta['Type']) !== strtolower($toColMeta['Type'])) {
+            $toType = $toColMeta['Type'];
+            $nullSql = ($fromColMeta['Null'] === 'YES') ? 'NULL' : 'NOT NULL';
+            try {
+                $dbConn->query("ALTER TABLE `{$fromTable}` MODIFY `{$fromCol}` {$toType} {$nullSql}");
+                $alignedMsg = " (Tipe data kolom '{$fromCol}' otomatis disesuaikan menjadi {$toType})";
+            } catch (Throwable $e) {
+                // Biarkan lanjut, tangani di ADD CONSTRAINT
+            }
+        }
+
+        $fkName = "fk_" . substr($fromTable, 0, 14) . "_" . substr($fromCol, 0, 14) . "_" . substr(md5(uniqid('', true)), 0, 6);
+
+        $sql = "ALTER TABLE `{$fromTable}` ADD CONSTRAINT `{$fkName}` FOREIGN KEY (`{$fromCol}`) REFERENCES `{$toTable}`(`{$toCol}`) ON DELETE {$onDelete} ON UPDATE {$onUpdate}";
+        
+        try {
+            $dbConn->query($sql);
+            echo json_encode([
+                'ok' => true, 
+                'pesan' => "Relasi Foreign Key '{$fromTable}.{$fromCol} ➔ {$toTable}.{$toCol}' berhasil dibuat!{$alignedMsg}", 
+                'constraint_name' => $fkName
+            ]);
+            exit;
+        } catch (Throwable $e) {
+            $err = $e->getMessage();
+            $customErr = $err;
+            if (stripos($err, 'are incompatible') !== false) {
+                $customErr = "Tipe data kolom '{$fromCol}' ({$fromColMeta['Type']}) dan '{$toCol}' ({$toColMeta['Type']}) tidak kompatibel di MySQL. Pastikan tipe data dan unsigned sama persis.";
+            } elseif (stripos($err, 'Cannot add or update a child row') !== false || stripos($err, 'foreign key constraint fails') !== false) {
+                $customErr = "Gagal menghubungkan relasi: Pada tabel anak '{$fromTable}', terdapat data yang nilainya tidak ditemukan di tabel induk '{$toTable}'.";
+            }
+            echo json_encode(['ok' => false, 'error' => "Gagal membuat Foreign Key: {$customErr}"]);
+            exit;
+        }
     }
 
     // -------------------------------------------------------------
@@ -493,14 +531,15 @@ try {
             exit;
         }
 
-        $sql = "ALTER TABLE `{$table}` DROP FOREIGN KEY `{$constraint}`";
-        if (!$dbConn->query($sql)) {
-            echo json_encode(['ok' => false, 'error' => 'Gagal menghapus Foreign Key: ' . $dbConn->error]);
+        try {
+            $sql = "ALTER TABLE `{$table}` DROP FOREIGN KEY `{$constraint}`";
+            $dbConn->query($sql);
+            echo json_encode(['ok' => true, 'pesan' => "Relasi Foreign Key '$constraint' berhasil dihapus dari tabel '$table'!"]);
+            exit;
+        } catch (Throwable $e) {
+            echo json_encode(['ok' => false, 'error' => 'Gagal menghapus Foreign Key: ' . $e->getMessage()]);
             exit;
         }
-
-        echo json_encode(['ok' => true, 'pesan' => "Relasi '$constraint' berhasil dihapus!"]);
-        exit;
     }
 
     // -------------------------------------------------------------
@@ -585,14 +624,19 @@ try {
     $existingRelKeys = [];
 
     $fkSql = "SELECT 
-                TABLE_NAME, 
-                COLUMN_NAME, 
-                CONSTRAINT_NAME, 
-                REFERENCED_TABLE_NAME, 
-                REFERENCED_COLUMN_NAME
-              FROM information_schema.KEY_COLUMN_USAGE
-             WHERE TABLE_SCHEMA = ?
-               AND REFERENCED_TABLE_NAME IS NOT NULL";
+                k.TABLE_NAME, 
+                k.COLUMN_NAME, 
+                k.CONSTRAINT_NAME, 
+                k.REFERENCED_TABLE_NAME, 
+                k.REFERENCED_COLUMN_NAME,
+                r.UPDATE_RULE,
+                r.DELETE_RULE
+              FROM information_schema.KEY_COLUMN_USAGE k
+              LEFT JOIN information_schema.REFERENTIAL_CONSTRAINTS r 
+                ON k.CONSTRAINT_NAME = r.CONSTRAINT_NAME 
+               AND k.CONSTRAINT_SCHEMA = r.CONSTRAINT_SCHEMA
+             WHERE k.TABLE_SCHEMA = ?
+               AND k.REFERENCED_TABLE_NAME IS NOT NULL";
     $fkStmt = $dbConn->prepare($fkSql);
     if ($fkStmt) {
         $fkStmt->bind_param("s", $dbRow['db_name']);
@@ -614,7 +658,9 @@ try {
                 'to_column' => $toCol,
                 'type' => 'explicit',
                 'label' => $fk['CONSTRAINT_NAME'] ?: 'FK',
-                'constraint_name' => $fk['CONSTRAINT_NAME']
+                'constraint_name' => $fk['CONSTRAINT_NAME'],
+                'on_delete' => $fk['DELETE_RULE'] ?: 'CASCADE',
+                'on_update' => $fk['UPDATE_RULE'] ?: 'CASCADE'
             ];
         }
     }
