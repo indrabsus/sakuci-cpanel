@@ -391,17 +391,17 @@ html, body {
 }
 .designer-modal-backdrop {
     position: static !important;
-    width: 100vw !important;
-    height: 100vh !important;
+    width: 100% !important;
+    height: 100% !important;
     padding: 0 !important;
     background: transparent !important;
     display: flex !important;
 }
 .designer-container {
-    width: 100vw !important;
-    height: 100vh !important;
-    max-width: 100vw !important;
-    max-height: 100vh !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
     border-radius: 0 !important;
     border: none !important;
     box-shadow: none !important;

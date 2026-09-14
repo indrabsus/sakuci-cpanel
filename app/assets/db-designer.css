@@ -58,11 +58,14 @@
     justify-content: space-between;
     background: #111827;
     border-bottom: 1px solid #1f2937;
-    padding: 8px 16px;
-    height: 52px;
+    padding: 10px 16px;
+    min-height: 54px;
+    height: auto;
     flex-shrink: 0;
     z-index: 20;
-    gap: 12px;
+    gap: 10px 14px;
+    flex-wrap: wrap;
+    box-sizing: border-box;
 }
 
 .designer-title-group {
@@ -100,10 +103,12 @@
     border: 1px solid #374151;
     color: #f3f4f6;
     border-radius: 6px;
-    padding: 5px 10px;
-    font-size: 12px;
+    padding: 0 12px;
+    height: 32px;
+    font-size: 12.5px;
     width: 150px;
     outline: none;
+    box-sizing: border-box;
     transition: all 0.15s ease;
 }
 .designer-search-input:focus {
@@ -115,11 +120,13 @@
 .designer-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 5px;
     background: #1f2937;
     border: 1px solid #374151;
     color: #e5e7eb;
-    padding: 5px 10px;
+    padding: 0 10px;
+    height: 32px;
     border-radius: 6px;
     font-size: 12px;
     font-weight: 500;
@@ -127,6 +134,7 @@
     transition: all 0.15s ease;
     user-select: none;
     white-space: nowrap;
+    box-sizing: border-box;
 }
 .designer-btn:hover {
     background: #374151;
@@ -503,24 +511,56 @@
 /* Mobile Media Query for Designer */
 @media (max-width: 768px) {
     .designer-toolbar {
-        padding: 6px 10px;
-        height: auto;
-        flex-wrap: wrap;
-        gap: 6px;
+        padding: max(12px, env(safe-area-inset-top, 12px)) 12px 10px 12px !important;
+        min-height: auto !important;
+        height: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+        box-sizing: border-box !important;
+    }
+    .designer-title-group {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        width: 100% !important;
+    }
+    .designer-controls {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        gap: 6px !important;
+        width: 100% !important;
+        justify-content: flex-start !important;
     }
     .designer-search-input {
-        width: 100px;
-        font-size: 12px;
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 1 1 100% !important;
+        height: 35px !important;
+        font-size: 13px !important;
+        margin-bottom: 2px !important;
+        padding: 0 12px !important;
     }
     .designer-search-input:focus {
-        width: 120px;
+        width: 100% !important;
     }
     .designer-btn {
-        padding: 5px 8px;
-        font-size: 12px;
+        height: 32px !important;
+        padding: 0 9px !important;
+        font-size: 12px !important;
     }
     .designer-btn span.btn-label {
-        display: none;
+        display: inline !important;
+    }
+    .designer-btn-close {
+        margin-left: auto !important;
+    }
+    .designer-legend {
+        padding: 6px 12px !important;
+        font-size: 11px !important;
+        gap: 10px !important;
     }
     .designer-card {
         width: 220px;
