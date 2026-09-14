@@ -182,6 +182,10 @@
      * Tutup modal desainer
      */
     function closeDatabaseDesigner() {
+        if (window.parent && window.parent.VSC_IDE && window !== window.parent) {
+            window.parent.VSC_IDE.switchView('editor');
+            return;
+        }
         if (elModal) elModal.classList.remove('show');
         document.body.style.overflow = '';
         closePreview();
@@ -2368,6 +2372,12 @@
             }
 
             alert(msg);
+
+            try {
+                if (window.parent && window.parent.VSC_IDE && typeof window.parent.VSC_IDE.loadTree === 'function') {
+                    window.parent.VSC_IDE.loadTree();
+                }
+            } catch (e) {}
 
             // Muat ulang status agar terupdate
             openSyncCodeModal();

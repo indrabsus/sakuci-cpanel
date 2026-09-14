@@ -32,14 +32,12 @@ function layout_start(string $judul, string $subjudul, string $aktif, array $use
     if (is_admin($user)) {
         $menu = [
             'dashboard' => ['Dashboard', 'dashboard.php', 'grid'],
-            'db'        => ['Database',  'databases.php', 'db'],
             'users'     => ['Pengguna',  'users.php',     'users'],
         ];
     } else {
         $menu = [
             'dashboard' => ['Dashboard',      'dashboard.php',   'grid'],
             'add'       => ['Tambah Project', 'add-project.php', 'plus'],
-            'db'        => ['Database',       'databases.php',   'db'],
         ];
     }
 

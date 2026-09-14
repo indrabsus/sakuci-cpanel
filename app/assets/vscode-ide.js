@@ -241,12 +241,18 @@
         currentMode = mode;
         if (!elWorkspace) return;
 
-        elWorkspace.classList.remove('mode-explorer', 'mode-editor', 'mode-git');
+        elWorkspace.classList.remove('mode-explorer', 'mode-editor', 'mode-git', 'mode-designer');
         elWorkspace.classList.add('mode-' + mode);
 
         if (elBtnTabExplorer) elBtnTabExplorer.classList.toggle('active', mode === 'explorer');
         if (elBtnTabEditor) elBtnTabEditor.classList.toggle('active', mode === 'editor');
         if (elBtnTabGit) elBtnTabGit.classList.toggle('active', mode === 'git');
+
+        const elBtnTabDesigner = document.getElementById('tab-btn-designer');
+        if (elBtnTabDesigner) elBtnTabDesigner.classList.toggle('active', mode === 'designer');
+
+        const elActBtnDesigner = document.getElementById('act-btn-designer');
+        if (elActBtnDesigner) elActBtnDesigner.classList.toggle('active', mode === 'designer');
 
         const fabBtn = document.getElementById('vsc-mobile-fab-save');
         if (mode === 'editor') {
@@ -260,6 +266,11 @@
             if (mode === 'git') {
                 fetchGitStatus();
                 fetchGitHistory();
+            } else if (mode === 'designer') {
+                const iframe = document.getElementById('vsc-designer-iframe');
+                if (iframe && iframe.getAttribute('data-src') && (!iframe.src || iframe.src === 'about:blank' || iframe.src.endsWith('about:blank'))) {
+                    iframe.src = iframe.getAttribute('data-src');
+                }
             }
         }
     }

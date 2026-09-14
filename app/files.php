@@ -26,6 +26,12 @@ $hasToken = !empty($project['github_token']);
 $isAdmin = is_admin($user);
 $initialPath = trim($_GET['path'] ?? '');
 $webUrl = SITE_DOMAIN !== '' ? 'https://' . basename($root) . '.' . SITE_DOMAIN : '';
+
+$stmtDb = $conn->prepare("SELECT id, db_name FROM db_list WHERE project_id = ? LIMIT 1");
+$stmtDb->bind_param("i", $project_id);
+$stmtDb->execute();
+$projectDb = $stmtDb->get_result()->fetch_assoc();
+$dbId = $projectDb ? (int) $projectDb['id'] : 0;
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -65,6 +71,11 @@ $webUrl = SITE_DOMAIN !== '' ? 'https://' . basename($root) . '.' . SITE_DOMAIN 
             <button type="button" class="vsc-view-tab" id="tab-btn-git" onclick="window.VSC_IDE.switchView('git')">
                 <span>🌿</span> Git <span id="vsc-git-badge-counter" class="vsc-git-badge-counter">0</span>
             </button>
+            <?php if ($dbId > 0): ?>
+            <button type="button" class="vsc-view-tab" id="tab-btn-designer" onclick="window.VSC_IDE.switchView('designer')">
+                <span>📐</span> Table Designer
+            </button>
+            <?php endif; ?>
         </div>
 
         <!-- Sisi Kanan: Aksi Cepat CLI, Simpan, Push & Buka Web -->
@@ -99,6 +110,11 @@ $webUrl = SITE_DOMAIN !== '' ? 'https://' . basename($root) . '.' . SITE_DOMAIN 
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
                 <span id="vsc-act-git-dot" class="vsc-act-dot"></span>
             </button>
+            <?php if ($dbId > 0): ?>
+            <button type="button" class="vsc-act-btn" id="act-btn-designer" title="Table Designer (Skema Database)" onclick="window.VSC_IDE.switchView('designer')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            </button>
+            <?php endif; ?>
             <button type="button" class="vsc-act-btn" id="act-btn-cli" title="Sakuci CLI Helper (Controller, Model, Migrate)" onclick="openCliModal()">
                 ⚡
             </button>
@@ -258,6 +274,13 @@ $webUrl = SITE_DOMAIN !== '' ? 'https://' . basename($root) . '.' . SITE_DOMAIN 
                 </div>
             </div>
         </div>
+
+        <?php if ($dbId > 0): ?>
+        <!-- Table Designer View (Embedded) -->
+        <div id="vsc-designer-view" class="vsc-designer-view">
+            <iframe id="vsc-designer-iframe" src="about:blank" data-src="databases.php?open_designer=<?php echo $dbId; ?>&amp;embedded=1" style="width:100%; height:100%; border:none; background:#0b0f19" allow="clipboard-write"></iframe>
+        </div>
+        <?php endif; ?>
     </div>
 
     <!-- Bottom Status Bar -->

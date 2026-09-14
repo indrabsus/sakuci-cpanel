@@ -54,8 +54,9 @@ function get_project_commit(string $localPath, string $gitUrl = ''): ?array
 
 // Admin melihat milik semua orang; siswa hanya miliknya sendiri.
 $projects = [];
-$sql = "SELECT p.*, u.username AS owner FROM projects p
-        JOIN users u ON u.id = p.user_id"
+$sql = "SELECT p.*, u.username AS owner, d.id AS db_id, d.db_name FROM projects p
+        JOIN users u ON u.id = p.user_id
+        LEFT JOIN db_list d ON d.project_id = p.id"
      . ($admin ? "" : " WHERE p.user_id = $user_id")
      . " ORDER BY p.created_at DESC";
 $result = $conn->query($sql);
@@ -285,6 +286,7 @@ layout_start(
                     'branch'   => $project['git_branch'] ?: 'main',
                     'secret'   => $project['webhook_secret'],
                     'hasToken' => $hasToken,
+                    'token'    => $project['github_token'] ?? '',
                     'gitUrl'   => $project['git_url'],
                 ];
                 ?>
@@ -382,10 +384,10 @@ layout_start(
                             ⚡ Webhook &amp; Git
                         </button>
 
-                        <?php if ($cloned && $url !== ''): ?>
-                            <a class="git-btn git-btn-open" target="_blank" rel="noopener noreferrer"
-                               href="<?php echo htmlspecialchars($url); ?>">Buka Web</a>
-                        <?php endif; ?>
+                        <a class="git-btn git-btn-db" href="<?php echo !empty($project['db_id']) ? 'databases.php?open_designer=' . $project['db_id'] : 'databases.php'; ?>" title="Buka Database &amp; Table Designer">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                            <span>Database</span>
+                        </a>
                         <a class="git-btn git-btn-file" href="files.php?project=<?php echo $project['id']; ?>" title="Buka Code Editor">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
                             <span>Editor</span>
@@ -454,7 +456,10 @@ layout_start(
                         <label for="modal-token" style="font-weight:600; margin:0">GitHub Personal Access Token (PAT)</label>
                         <div id="modal-token-status"></div>
                     </div>
-                    <input type="password" name="github_token" id="modal-token" placeholder="Masukkan token baru (ghp_...) untuk mengubah atau mengaktifkan" autocomplete="off" style="width:100%">
+                    <div style="position:relative; display:flex; align-items:center">
+                        <input type="password" name="github_token" id="modal-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off" style="width:100%; padding-right:2.5rem">
+                        <button type="button" id="btn-toggle-token" onclick="toggleTokenVisibility()" style="position:absolute; right:0.5rem; background:none; border:none; cursor:pointer; font-size:1.1rem; color:var(--ink-2); padding:0.2rem" title="Lihat/Sembunyikan Token">👁️</button>
+                    </div>
                     <div class="hint" style="line-height:1.45; margin-top:.35rem">
                         Dibutuhkan jika repositori berstatus <strong>Private</strong> atau untuk mengaktifkan fitur <strong>Commit &amp; Push</strong> dua arah langsung dari cPanel. Dapatkan di GitHub: <em>Settings &rarr; Developer Settings &rarr; Personal Access Tokens (Classic)</em> dengan izin <code>repo</code>.
                     </div>

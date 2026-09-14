@@ -269,8 +269,24 @@ function openGitSettings(project) {
         document.getElementById('btn-hapus-token').style.display = 'none';
     }
 
-    document.getElementById('modal-token').value = '';
+    document.getElementById('modal-token').value = project.token || '';
+    document.getElementById('modal-token').type = 'password';
+    const toggleBtn = document.getElementById('btn-toggle-token');
+    if (toggleBtn) toggleBtn.textContent = '👁️';
     modal.style.display = 'flex';
+}
+
+function toggleTokenVisibility() {
+    const input = document.getElementById('modal-token');
+    const btn = document.getElementById('btn-toggle-token');
+    if (!input) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        if (btn) btn.textContent = '🙈';
+    } else {
+        input.type = 'password';
+        if (btn) btn.textContent = '👁️';
+    }
 }
 
 function closeGitSettings() {
@@ -313,9 +329,7 @@ async function saveGitSettings(e) {
     const formData = new URLSearchParams();
     formData.append('project_id', projectId);
     formData.append('git_branch', branch);
-    if (token) {
-        formData.append('github_token', token);
-    }
+    formData.append('github_token', token);
 
     try {
         const res = await fetch('api/update-project.php', {

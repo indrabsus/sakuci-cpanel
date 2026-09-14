@@ -374,3 +374,14 @@
     border-color: #38bdf8 !important;
     color: #7dd3fc !important;
 }
+
+
+.git-btn-db {
+    color: #a855f7 !important;
+    border-color: rgba(168, 85, 247, 0.35) !important;
+}
+.git-btn-db:hover:not(:disabled) {
+    background: rgba(168, 85, 247, 0.12) !important;
+    border-color: #a855f7 !important;
+    color: #c084fc !important;
+}
