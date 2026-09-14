@@ -2162,7 +2162,7 @@
         if (btnSync) btnSync.disabled = true;
 
         try {
-            const res = await fetch(`app/api/db-designer.php?action=get_sync_status&db_id=${activeDbId}`, {
+            const res = await fetch(`api/db-designer.php?action=get_sync_status&db_id=${activeDbId}`, {
                 credentials: 'same-origin'
             });
             const data = await res.json();
@@ -2333,7 +2333,7 @@
             fd.append('action', 'sync_codebase');
             fd.append('items', JSON.stringify(items));
 
-            const res = await fetch('app/api/db-designer.php', {
+            const res = await fetch('api/db-designer.php', {
                 method: 'POST',
                 body: fd,
                 credentials: 'same-origin'
