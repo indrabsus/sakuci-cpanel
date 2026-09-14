@@ -109,9 +109,14 @@
                     </div>
                     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
                         <div style="font-size:12.5px; font-weight:600; color:#38bdf8">Struktur Kolom Tabel:</div>
-                        <button type="button" class="designer-btn designer-btn-sm" onclick="window.DB_DESIGNER.appendCreateTableColumnRow()">
-                            + Tambah Baris Kolom
-                        </button>
+                        <div style="display:flex; gap:6px">
+                            <button type="button" class="designer-btn designer-btn-sm" onclick="window.DB_DESIGNER.addTimestampsRow()" title="Tambahkan created_at & updated_at jika belum ada">
+                                + Timestamps
+                            </button>
+                            <button type="button" class="designer-btn designer-btn-sm" onclick="window.DB_DESIGNER.appendCreateTableColumnRow()">
+                                + Tambah Baris Kolom
+                            </button>
+                        </div>
                     </div>
                     <div class="designer-table-scroll">
                         <table class="designer-input-table">

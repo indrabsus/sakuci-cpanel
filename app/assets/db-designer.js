@@ -882,15 +882,16 @@
         if (nameInput) nameInput.value = '';
         if (bodyEl) bodyEl.innerHTML = '';
 
-        appendCreateTableColumnRow({ name: 'id', type: 'INT', length: '11', is_pk: true, is_ai: true, null: false, default: '' });
-        appendCreateTableColumnRow({ name: 'nama', type: 'VARCHAR', length: '255', is_pk: false, is_ai: false, null: false, default: '' });
-        appendCreateTableColumnRow({ name: 'created_at', type: 'TIMESTAMP', length: '', is_pk: false, is_ai: false, null: false, default: 'CURRENT_TIMESTAMP' });
+        // Sakuci Framework Standard: id, created_at, updated_at (DATETIME NULL)
+        appendCreateTableColumnRow({ name: 'id', type: 'INT', length: '11', is_pk: true, is_ai: true, null: false, default: '' }, false);
+        appendCreateTableColumnRow({ name: 'created_at', type: 'DATETIME', length: '', is_pk: false, is_ai: false, null: true, default: '' }, false);
+        appendCreateTableColumnRow({ name: 'updated_at', type: 'DATETIME', length: '', is_pk: false, is_ai: false, null: true, default: '' }, false);
 
         openSubmodal('create-table');
         if (nameInput) setTimeout(() => nameInput.focus(), 150);
     }
 
-    function appendCreateTableColumnRow(def = {}) {
+    function appendCreateTableColumnRow(def = {}, insertBeforeTimestamps = true) {
         const bodyEl = document.getElementById('dsg-create-cols-body');
         if (!bodyEl) return;
 
@@ -943,7 +944,50 @@
             typeSelect.addEventListener('change', () => onColTypeChange(typeSelect.value, lenInput));
         }
 
-        bodyEl.appendChild(tr);
+        // Sisipkan sebelum kolom timestamp jika ada, agar created_at & updated_at tetap berada di baris paling bawah
+        if (insertBeforeTimestamps) {
+            const rows = bodyEl.querySelectorAll('tr');
+            let insertRef = null;
+            for (const r of rows) {
+                const nameVal = (r.querySelector('.dsg-create-col-name')?.value || '').trim().toLowerCase();
+                if (nameVal === 'created_at' || nameVal === 'updated_at') {
+                    insertRef = r;
+                    break;
+                }
+            }
+            if (insertRef) {
+                bodyEl.insertBefore(tr, insertRef);
+            } else {
+                bodyEl.appendChild(tr);
+            }
+        } else {
+            bodyEl.appendChild(tr);
+        }
+
+        if (!def.name) {
+            const nameInp = tr.querySelector('.dsg-create-col-name');
+            if (nameInp) setTimeout(() => nameInp.focus(), 50);
+        }
+    }
+
+    function addTimestampsRow() {
+        const bodyEl = document.getElementById('dsg-create-cols-body');
+        if (!bodyEl) return;
+        const rows = bodyEl.querySelectorAll('tr');
+        let hasCreated = false;
+        let hasUpdated = false;
+        rows.forEach(r => {
+            const nameVal = (r.querySelector('.dsg-create-col-name')?.value || '').trim().toLowerCase();
+            if (nameVal === 'created_at') hasCreated = true;
+            if (nameVal === 'updated_at') hasUpdated = true;
+        });
+
+        if (!hasCreated) {
+            appendCreateTableColumnRow({ name: 'created_at', type: 'DATETIME', length: '', is_pk: false, is_ai: false, null: true, default: '' }, false);
+        }
+        if (!hasUpdated) {
+            appendCreateTableColumnRow({ name: 'updated_at', type: 'DATETIME', length: '', is_pk: false, is_ai: false, null: true, default: '' }, false);
+        }
     }
 
     function removeCreateColRow(btn) {
@@ -2407,6 +2451,7 @@
         closePreview,
         openCreateTableModal,
         appendCreateTableColumnRow,
+        addTimestampsRow,
         removeCreateColRow,
         submitCreateTable,
         dropTable,
