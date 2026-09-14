@@ -316,10 +316,7 @@ layout_start(
                             </div>
                             <div class="proyek-m mono"><?php echo htmlspecialchars($project['git_url']); ?></div>
                         </div>
-                        <button type="button" class="git-btn git-btn-webhook" style="font-size:.78rem; padding:.25rem .6rem"
-                                onclick="openGitSettings(<?php echo htmlspecialchars(json_encode($modalData), ENT_QUOTES); ?>)">
-                            ⚡ Auto-Deploy
-                        </button>
+
                     </div>
 
                     <dl class="proyek-d">
