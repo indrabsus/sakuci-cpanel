@@ -881,3 +881,36 @@
     border-radius: 4px;
     font-weight: 600;
 }
+
+/* Tombol Edit Baris Data di Drawer */
+.designer-row-edit-btn {
+    background: rgba(56, 189, 248, 0.15);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    color: #38bdf8;
+    padding: 2px 7px;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    margin-right: 4px;
+}
+.designer-row-edit-btn:hover {
+    background: #0284c7;
+    color: #ffffff;
+}
+
+/* Tombol Edit Kolom pada Baris Kolom Kartu */
+.designer-col-edit-btn {
+    display: none;
+    background: transparent;
+    border: none;
+    color: #38bdf8;
+    font-size: 11px;
+    cursor: pointer;
+    padding: 0 3px;
+    margin-left: 2px;
+}
+.designer-col-row:hover .designer-col-edit-btn {
+    display: inline-block;
+}

@@ -243,6 +243,30 @@ try {
     }
 
     // -------------------------------------------------------------
+    // ACTION: RENAME_TABLE (Ubah nama tabel)
+    // -------------------------------------------------------------
+    if ($action === 'rename_table') {
+        $table = trim($_POST['table'] ?? '');
+        $newTableName = trim($_POST['new_table_name'] ?? '');
+        if (!validate_sql_ident($table) || !validate_sql_ident($newTableName)) {
+            echo json_encode(['ok' => false, 'error' => 'Nama tabel lama atau nama tabel baru tidak valid.']);
+            exit;
+        }
+
+        try {
+            if (!$dbConn->query("RENAME TABLE `{$table}` TO `{$newTableName}`")) {
+                echo json_encode(['ok' => false, 'error' => 'Gagal mengubah nama tabel: ' . $dbConn->error]);
+                exit;
+            }
+            echo json_encode(['ok' => true, 'pesan' => "Tabel '$table' berhasil diubah namanya menjadi '$newTableName'!"]);
+            exit;
+        } catch (Throwable $e) {
+            echo json_encode(['ok' => false, 'error' => 'Gagal mengubah nama tabel: ' . $e->getMessage()]);
+            exit;
+        }
+    }
+
+    // -------------------------------------------------------------
     // 4. ACTION: ADD_COLUMN (Tambah kolom ke tabel)
     // -------------------------------------------------------------
     if ($action === 'add_column') {
@@ -319,6 +343,66 @@ try {
 
         echo json_encode(['ok' => true, 'pesan' => "Kolom '$colName' berhasil dihapus dari tabel '$table'!"]);
         exit;
+    }
+
+    // -------------------------------------------------------------
+    // ACTION: MODIFY_COLUMN (Ubah nama / tipe data / atribut kolom)
+    // -------------------------------------------------------------
+    if ($action === 'modify_column') {
+        $table = trim($_POST['table'] ?? '');
+        $oldCol = trim($_POST['old_column'] ?? '');
+        $newCol = trim($_POST['column_name'] ?? '');
+        if (!validate_sql_ident($table) || !validate_sql_ident($oldCol) || !validate_sql_ident($newCol)) {
+            echo json_encode(['ok' => false, 'error' => 'Nama tabel atau kolom tidak valid.']);
+            exit;
+        }
+
+        $cType = strtoupper(trim($_POST['type'] ?? 'VARCHAR'));
+        $allowedTypes = ['INT', 'BIGINT', 'TINYINT', 'SMALLINT', 'VARCHAR', 'CHAR', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'DECIMAL', 'FLOAT', 'DOUBLE', 'DATE', 'DATETIME', 'TIMESTAMP', 'TIME', 'BOOLEAN', 'JSON'];
+        if (!in_array($cType, $allowedTypes, true)) {
+            $cType = 'VARCHAR';
+        }
+
+        $cLength = trim((string) ($_POST['length'] ?? ''));
+        $typeWithLen = $cType;
+        if ($cLength !== '' && preg_match('/^[0-9]+(,[0-9]+)?$/', $cLength)) {
+            $typeWithLen .= "({$cLength})";
+        } elseif ($cType === 'VARCHAR' && $cLength === '') {
+            $typeWithLen .= "(255)";
+        }
+
+        $nullSql = !empty($_POST['is_null']) ? "NULL" : "NOT NULL";
+        $defaultSql = "";
+        $defaultVal = $_POST['default'] ?? null;
+        if ($defaultVal !== null && $defaultVal !== '') {
+            if (strtoupper($defaultVal) === 'NULL') {
+                $defaultSql = " DEFAULT NULL";
+            } elseif (strtoupper($defaultVal) === 'CURRENT_TIMESTAMP') {
+                $defaultSql = " DEFAULT CURRENT_TIMESTAMP";
+            } else {
+                $escapedDef = $dbConn->real_escape_string($defaultVal);
+                $defaultSql = " DEFAULT '{$escapedDef}'";
+            }
+        }
+
+        $extraSql = "";
+        if (!empty($_POST['is_ai'])) {
+            $extraSql .= " AUTO_INCREMENT";
+        }
+
+        try {
+            $alterSql = "ALTER TABLE `{$table}` CHANGE COLUMN `{$oldCol}` `{$newCol}` {$typeWithLen} {$nullSql}{$defaultSql}{$extraSql}";
+            if (!$dbConn->query($alterSql)) {
+                echo json_encode(['ok' => false, 'error' => 'Gagal mengubah kolom: ' . $dbConn->error]);
+                exit;
+            }
+
+            echo json_encode(['ok' => true, 'pesan' => "Kolom '$oldCol' berhasil diperbarui!"]);
+            exit;
+        } catch (Throwable $e) {
+            echo json_encode(['ok' => false, 'error' => 'Gagal mengubah kolom: ' . $e->getMessage()]);
+            exit;
+        }
     }
 
     // -------------------------------------------------------------
@@ -448,6 +532,102 @@ try {
 
         echo json_encode(['ok' => true, 'pesan' => 'Baris data berhasil dihapus!']);
         exit;
+    }
+
+    // -------------------------------------------------------------
+    // ACTION: UPDATE_ROW (Ubah data baris tabel)
+    // -------------------------------------------------------------
+    if ($action === 'update_row') {
+        $table = trim($_POST['table'] ?? '');
+        if (!validate_sql_ident($table)) {
+            echo json_encode(['ok' => false, 'error' => 'Nama tabel tidak valid.']);
+            exit;
+        }
+
+        $pkRaw = $_POST['pk'] ?? [];
+        if (is_string($pkRaw)) {
+            $pkRaw = json_decode($pkRaw, true) ?: [];
+        }
+        if (!is_array($pkRaw) || empty($pkRaw)) {
+            echo json_encode(['ok' => false, 'error' => 'Identitas baris (Primary Key) tidak boleh kosong.']);
+            exit;
+        }
+
+        $dataRaw = $_POST['data'] ?? [];
+        if (is_string($dataRaw)) {
+            $dataRaw = json_decode($dataRaw, true) ?: [];
+        }
+        if (!is_array($dataRaw) || empty($dataRaw)) {
+            echo json_encode(['ok' => false, 'error' => 'Data perubahan tidak boleh kosong.']);
+            exit;
+        }
+
+        $colRes = $dbConn->query("SHOW FULL COLUMNS FROM `{$table}`");
+        if (!$colRes) {
+            echo json_encode(['ok' => false, 'error' => "Tabel '$table' tidak ditemukan."]);
+            exit;
+        }
+        $tableCols = [];
+        while ($c = $colRes->fetch_assoc()) {
+            $tableCols[$c['Field']] = $c;
+        }
+
+        $setParts = [];
+        $setValues = [];
+        $types = "";
+
+        foreach ($dataRaw as $colName => $val) {
+            if (!isset($tableCols[$colName])) continue;
+            $colMeta = $tableCols[$colName];
+
+            $setParts[] = "`{$colName}` = ?";
+            if ($val === '' && $colMeta['Null'] === 'YES') {
+                $setValues[] = null;
+                $types .= "s";
+            } else {
+                $setValues[] = $val;
+                $types .= "s";
+            }
+        }
+
+        if (empty($setParts)) {
+            echo json_encode(['ok' => false, 'error' => 'Tidak ada data kolom yang diubah.']);
+            exit;
+        }
+
+        $whereParts = [];
+        foreach ($pkRaw as $pkCol => $pkVal) {
+            if (!validate_sql_ident($pkCol)) continue;
+            $whereParts[] = "`{$pkCol}` = ?";
+            $setValues[] = $pkVal;
+            $types .= "s";
+        }
+
+        if (empty($whereParts)) {
+            echo json_encode(['ok' => false, 'error' => 'Kondisi Primary Key tidak valid.']);
+            exit;
+        }
+
+        try {
+            $sql = "UPDATE `{$table}` SET " . implode(", ", $setParts) . " WHERE " . implode(" AND ", $whereParts) . " LIMIT 1";
+            $stmt = $dbConn->prepare($sql);
+            if (!$stmt) {
+                echo json_encode(['ok' => false, 'error' => 'Gagal menyiapkan query: ' . $dbConn->error]);
+                exit;
+            }
+
+            $stmt->bind_param($types, ...$setValues);
+            if (!$stmt->execute()) {
+                echo json_encode(['ok' => false, 'error' => 'Gagal memperbarui data: ' . $stmt->error]);
+                exit;
+            }
+
+            echo json_encode(['ok' => true, 'pesan' => 'Baris data berhasil diperbarui!']);
+            exit;
+        } catch (Throwable $e) {
+            echo json_encode(['ok' => false, 'error' => 'Gagal memperbarui data: ' . $e->getMessage()]);
+            exit;
+        }
     }
 
     // -------------------------------------------------------------

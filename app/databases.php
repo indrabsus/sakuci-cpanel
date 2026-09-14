@@ -872,6 +872,129 @@ function salinCadangan(teks, selesai) {
                 </div>
             </div>
         </div>
+
+        <!-- Submodal 6: Edit Struktur & Nama Tabel -->
+        <div id="designer-modal-edit-table" class="designer-submodal-backdrop">
+            <div class="designer-submodal-card" style="max-width:760px">
+                <div class="designer-submodal-header">
+                    <div style="display:flex; align-items:center; gap:8px">
+                        <span>✏️</span>
+                        <span id="dsg-edit-tbl-title">Edit Struktur Tabel</span>
+                    </div>
+                    <button type="button" class="designer-btn designer-btn-sm" onclick="window.DB_DESIGNER.closeSubmodal('edit-table')">✕</button>
+                </div>
+                <div class="designer-submodal-body">
+                    <div style="background:rgba(255,255,255,0.03); border:1px solid #334155; border-radius:8px; padding:12px; margin-bottom:16px">
+                        <label class="designer-form-label" style="margin-bottom:6px; display:block">Ubah Nama Tabel:</label>
+                        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+                            <input type="hidden" id="dsg-edit-tbl-old-name" value="">
+                            <input type="text" id="dsg-edit-tbl-new-name" class="designer-input" style="max-width:320px" placeholder="Nama tabel baru">
+                            <button type="button" class="designer-btn designer-btn-primary" onclick="window.DB_DESIGNER.submitRenameTable()">
+                                💾 Ganti Nama Tabel
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+                        <div style="font-size:12.5px; font-weight:600; color:#38bdf8">Daftar Kolom &amp; Tipe Data:</div>
+                        <button type="button" class="designer-btn designer-btn-primary designer-btn-sm" onclick="window.DB_DESIGNER.openAddColumnModal(document.getElementById('dsg-edit-tbl-old-name').value)">
+                            ➕ Tambah Kolom Baru
+                        </button>
+                    </div>
+                    <div id="dsg-edit-tbl-cols-wrap" class="designer-table-scroll" style="max-height:300px">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+                <div class="designer-submodal-footer">
+                    <button type="button" class="designer-btn" onclick="window.DB_DESIGNER.closeSubmodal('edit-table')">Tutup</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submodal 7: Ubah Kolom (Modify Column) -->
+        <div id="designer-modal-edit-column" class="designer-submodal-backdrop">
+            <div class="designer-submodal-card" style="max-width:480px">
+                <div class="designer-submodal-header">
+                    <div style="display:flex; align-items:center; gap:8px">
+                        <span>✏️</span>
+                        <span id="dsg-edit-col-title">Ubah Kolom</span>
+                    </div>
+                    <button type="button" class="designer-btn designer-btn-sm" onclick="window.DB_DESIGNER.closeSubmodal('edit-column')">✕</button>
+                </div>
+                <div class="designer-submodal-body">
+                    <input type="hidden" id="dsg-edit-col-target-table" value="">
+                    <input type="hidden" id="dsg-edit-col-old-name" value="">
+                    <div class="designer-form-group">
+                        <label class="designer-form-label">Nama Kolom: <span style="color:#ef4444">*</span></label>
+                        <input type="text" id="dsg-edit-col-name" class="designer-input" placeholder="contoh: harga, deskripsi">
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+                        <div class="designer-form-group">
+                            <label class="designer-form-label">Tipe Data:</label>
+                            <select id="dsg-edit-col-type" class="designer-select" onchange="window.DB_DESIGNER.onColTypeChange(this.value, 'dsg-edit-col-length')">
+                                <option value="VARCHAR">VARCHAR</option>
+                                <option value="INT">INT</option>
+                                <option value="BIGINT">BIGINT</option>
+                                <option value="TEXT">TEXT</option>
+                                <option value="DECIMAL">DECIMAL</option>
+                                <option value="DATE">DATE</option>
+                                <option value="DATETIME">DATETIME</option>
+                                <option value="TIMESTAMP">TIMESTAMP</option>
+                                <option value="BOOLEAN">BOOLEAN</option>
+                                <option value="JSON">JSON</option>
+                            </select>
+                        </div>
+                        <div class="designer-form-group">
+                            <label class="designer-form-label">Panjang / Nilai:</label>
+                            <input type="text" id="dsg-edit-col-length" class="designer-input" value="255">
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+                        <div class="designer-form-group">
+                            <label class="designer-form-label">Boleh NULL:</label>
+                            <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-top:6px; color:#e2e8f0; cursor:pointer">
+                                <input type="checkbox" id="dsg-edit-col-null"> Ya, boleh NULL
+                            </label>
+                        </div>
+                        <div class="designer-form-group">
+                            <label class="designer-form-label">Nilai Default:</label>
+                            <input type="text" id="dsg-edit-col-default" class="designer-input" placeholder="NULL, 0, dll">
+                        </div>
+                    </div>
+                    <div class="designer-form-group">
+                        <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-top:4px; color:#e2e8f0; cursor:pointer">
+                            <input type="checkbox" id="dsg-edit-col-ai"> Auto Increment (Hanya untuk Primary Key INT)
+                        </label>
+                    </div>
+                </div>
+                <div class="designer-submodal-footer">
+                    <button type="button" class="designer-btn" onclick="window.DB_DESIGNER.closeSubmodal('edit-column')">Batal</button>
+                    <button type="button" class="designer-btn designer-btn-primary" onclick="window.DB_DESIGNER.submitEditColumn()">💾 Simpan Perubahan Kolom</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Submodal 8: Edit Baris Data (Update Row) -->
+        <div id="designer-modal-edit-row" class="designer-submodal-backdrop">
+            <div class="designer-submodal-card" style="max-width:560px">
+                <div class="designer-submodal-header">
+                    <div style="display:flex; align-items:center; gap:8px">
+                        <span>✏️</span>
+                        <span id="dsg-edit-row-title">Edit Data Baris</span>
+                    </div>
+                    <button type="button" class="designer-btn designer-btn-sm" onclick="window.DB_DESIGNER.closeSubmodal('edit-row')">✕</button>
+                </div>
+                <div class="designer-submodal-body">
+                    <input type="hidden" id="dsg-edit-row-table-name" value="">
+                    <input type="hidden" id="dsg-edit-row-pk" value="">
+                    <div id="dsg-edit-row-fields-wrap" style="display:flex; flex-direction:column; gap:10px"></div>
+                </div>
+                <div class="designer-submodal-footer">
+                    <button type="button" class="designer-btn" onclick="window.DB_DESIGNER.closeSubmodal('edit-row')">Batal</button>
+                    <button type="button" class="designer-btn designer-btn-primary" onclick="window.DB_DESIGNER.submitEditRow()">💾 Simpan Perubahan Data</button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 

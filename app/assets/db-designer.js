@@ -8,12 +8,14 @@
  * - Compatibility Checker & Auto-Align Types for Foreign Keys
  * - Dedicated Manage Relations Modal (Daftar & Hapus FK)
  * - Toggle Inferred Relations (On/Off)
+ * - Edit Table Structure: Rename Table & Modify Columns
+ * - Edit Column Modal (Change column name, type, length, null, default, AI)
  * - Pan & Zoom (Mouse drag, wheel, touch pan & pinch zoom)
  * - Auto-Arrange & Smart Grid
  * - Visual Table Creator (Create Table with columns builder)
  * - Drop Table with safe confirmation
  * - Add Column & Drop Column
- * - Data CRUD Drawer (Preview, Insert New Row, Delete Row)
+ * - Data CRUD Drawer (Preview, Insert New Row, Edit Row, Delete Row)
  */
 
 (function () {
@@ -158,7 +160,6 @@
             renderTables();
             renderRelations();
 
-            // Refresh modal daftar relasi jika sedang terbuka
             const manageModal = document.getElementById('designer-modal-manage-relations');
             if (manageModal && manageModal.classList.contains('show')) {
                 renderManageRelationsContent();
@@ -254,6 +255,9 @@
                     </div>
                     <div class="designer-card-actions">
                         <span class="designer-card-badge" id="card-badge-${escapeHtml(t.name)}">${rowsCountStr}</span>
+                        <button type="button" class="designer-card-btn-action" title="Ubah struktur &amp; nama tabel ${escapeHtml(t.name)}" onclick="event.stopPropagation(); window.DB_DESIGNER.openEditTableModal('${escapeHtml(t.name)}')">
+                            ✏️
+                        </button>
                         <button type="button" class="designer-card-btn-action" title="Tambah kolom ke ${escapeHtml(t.name)}" onclick="event.stopPropagation(); window.DB_DESIGNER.openAddColumnModal('${escapeHtml(t.name)}')">
                             ➕
                         </button>
@@ -292,6 +296,7 @@
                         <div class="designer-col-right">
                             <span class="designer-col-type">${escapeHtml(col.type)}</span>
                             ${nullStr}
+                            <button type="button" class="designer-col-edit-btn" title="Ubah kolom ${escapeHtml(col.name)}" onclick="event.stopPropagation(); window.DB_DESIGNER.openEditColumnModal('${escapeHtml(t.name)}', '${escapeHtml(col.name)}')">✏️</button>
                             ${!col.is_pk ? `<button type="button" class="designer-col-delete-btn" title="Hapus kolom ${escapeHtml(col.name)}" onclick="event.stopPropagation(); window.DB_DESIGNER.dropColumn('${escapeHtml(t.name)}', '${escapeHtml(col.name)}')">✕</button>` : ''}
                         </div>
                     </div>
@@ -339,7 +344,7 @@
     }
 
     /**
-     * Render SVG Bezier Relation Lines dengan Hitbox 28px untuk sentuhan HP yang presisi
+     * Render SVG Bezier Relation Lines dengan Hitbox 28px untuk sentuhan HP
      */
     function renderRelations() {
         if (!elSvgCanvas) return;
@@ -367,7 +372,6 @@
             const toCard = document.getElementById(`designer-card-${rel.to_table}`);
             if (!fromCard || !toCard) return;
 
-            // 1. Invisible wide hit area for easy click/touch on smartphone screens
             const hitArea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             hitArea.id = `rel-hit-${rel.id}`;
             hitArea.classList.add('designer-relation-hitarea');
@@ -378,7 +382,6 @@
             hitArea.style.pointerEvents = 'stroke';
             hitArea.style.cursor = 'pointer';
 
-            // 2. Visible styled relation curve
             const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             path.id = `rel-${rel.id}`;
             path.classList.add('designer-relation-line', rel.type);
@@ -393,14 +396,12 @@
             titleEl.textContent = `${rel.from_table}.${rel.from_column} → ${rel.to_table}.${rel.to_column} (${rel.type === 'explicit' ? 'Foreign Key: ' + (rel.constraint_name || rel.label) + ' • Klik untuk hapus' : 'Relasi Konvensi (Otomatis) • Klik untuk buat FK resmi'})`;
             path.appendChild(titleEl);
 
-            // Hover effects
             const setHighlight = (hover) => highlightRelation(rel, hover);
             hitArea.addEventListener('mouseenter', () => setHighlight(true));
             hitArea.addEventListener('mouseleave', () => setHighlight(false));
             path.addEventListener('mouseenter', () => setHighlight(true));
             path.addEventListener('mouseleave', () => setHighlight(false));
 
-            // Click / Tap on either hitArea or path
             const handleClick = (e) => {
                 e.stopPropagation();
                 onRelationClick(rel);
@@ -1072,6 +1073,234 @@
     }
 
     // ------------------------------------------------------------------
+    // FITUR 2B: EDIT STRUKTUR TABEL & RENAME TABEL
+    // ------------------------------------------------------------------
+    function openEditTableModal(tableName) {
+        const tableObj = (schemaData.tables || []).find(t => t.name === tableName);
+        if (!tableObj) return;
+
+        const titleEl = document.getElementById('dsg-edit-tbl-title');
+        const oldNameInput = document.getElementById('dsg-edit-tbl-old-name');
+        const newNameInput = document.getElementById('dsg-edit-tbl-new-name');
+        const colsWrap = document.getElementById('dsg-edit-tbl-cols-wrap');
+
+        if (titleEl) titleEl.textContent = `Edit Struktur Tabel: ${tableName}`;
+        if (oldNameInput) oldNameInput.value = tableName;
+        if (newNameInput) newNameInput.value = tableName;
+
+        if (colsWrap) {
+            let html = `
+                <table class="designer-input-table">
+                    <thead>
+                        <tr>
+                            <th style="min-width:140px">Nama Kolom</th>
+                            <th style="min-width:120px">Tipe Data</th>
+                            <th style="min-width:60px; text-align:center">Null</th>
+                            <th style="min-width:110px">Default</th>
+                            <th style="min-width:120px; text-align:center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            tableObj.columns.forEach(col => {
+                const pkLabel = col.is_pk ? ' 🔑 [PK]' : (isForeignKeyColumn(tableName, col.name) ? ' 🔗 [FK]' : '');
+                const nullText = col.null ? '<span style="color:#34d399">NULL</span>' : '<span style="color:#64748b">NOT NULL</span>';
+                const defText = col.default !== null ? escapeHtml(col.default) : '<span style="color:#64748b; font-style:italic">Tidak ada</span>';
+
+                html += `
+                    <tr>
+                        <td>
+                            <strong style="color:#f8fafc">${escapeHtml(col.name)}</strong>
+                            <span style="font-size:11px; color:#f59e0b">${pkLabel}</span>
+                        </td>
+                        <td>
+                            <span style="font-family:monospace; color:#38bdf8">${escapeHtml(col.type)}</span>
+                        </td>
+                        <td style="text-align:center">${nullText}</td>
+                        <td>${defText}</td>
+                        <td style="text-align:center">
+                            <button type="button" class="designer-row-edit-btn" onclick="window.DB_DESIGNER.openEditColumnModal('${escapeHtml(tableName)}', '${escapeHtml(col.name)}')">
+                                ✏️ Ubah
+                            </button>
+                            ${!col.is_pk ? `<button type="button" class="designer-row-del-btn" onclick="window.DB_DESIGNER.dropColumn('${escapeHtml(tableName)}', '${escapeHtml(col.name)}')">🗑️</button>` : ''}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+            colsWrap.innerHTML = html;
+        }
+
+        openSubmodal('edit-table');
+    }
+
+    async function submitRenameTable() {
+        if (!activeDbId) return;
+
+        const oldName = document.getElementById('dsg-edit-tbl-old-name')?.value || '';
+        const newName = (document.getElementById('dsg-edit-tbl-new-name')?.value || '').trim();
+
+        if (!oldName || !newName) {
+            alert('Nama tabel baru tidak boleh kosong.');
+            return;
+        }
+
+        if (oldName === newName) {
+            alert('Nama tabel baru sama dengan nama saat ini.');
+            return;
+        }
+
+        if (!confirm(`Apakah Anda yakin ingin mengubah nama tabel '${oldName}' menjadi '${newName}'?`)) {
+            return;
+        }
+
+        const fd = new FormData();
+        fd.append('db_id', activeDbId);
+        fd.append('action', 'rename_table');
+        fd.append('table', oldName);
+        fd.append('new_table_name', newName);
+
+        try {
+            const res = await fetch('api/db-designer.php', {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+
+            if (!data.ok) {
+                alert('Gagal mengubah nama tabel: ' + (data.error || 'Terjadi kesalahan.'));
+                return;
+            }
+
+            alert(data.pesan || 'Nama tabel berhasil diperbarui!');
+            if (cardPositions[oldName]) {
+                cardPositions[newName] = cardPositions[oldName];
+                delete cardPositions[oldName];
+            }
+
+            closeSubmodal('edit-table');
+            await reloadSchema(true);
+
+        } catch (err) {
+            alert('Kesalahan jaringan: ' + err.message);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // FITUR 2C: EDIT / UBAH KOLOM (MODIFY COLUMN)
+    // ------------------------------------------------------------------
+    function openEditColumnModal(tableName, colName) {
+        const tableObj = (schemaData.tables || []).find(t => t.name === tableName);
+        if (!tableObj) return;
+
+        const colObj = (tableObj.columns || []).find(c => c.name === colName);
+        if (!colObj) return;
+
+        const titleEl = document.getElementById('dsg-edit-col-title');
+        const targetTable = document.getElementById('dsg-edit-col-target-table');
+        const oldName = document.getElementById('dsg-edit-col-old-name');
+        const nameInput = document.getElementById('dsg-edit-col-name');
+        const typeSelect = document.getElementById('dsg-edit-col-type');
+        const lengthInput = document.getElementById('dsg-edit-col-length');
+        const nullCheck = document.getElementById('dsg-edit-col-null');
+        const defInput = document.getElementById('dsg-edit-col-default');
+        const aiCheck = document.getElementById('dsg-edit-col-ai');
+
+        if (titleEl) titleEl.textContent = `Ubah Kolom: ${tableName}.${colName}`;
+        if (targetTable) targetTable.value = tableName;
+        if (oldName) oldName.value = colName;
+        if (nameInput) nameInput.value = colName;
+
+        let baseType = 'VARCHAR';
+        let lenVal = '';
+        const rawType = (colObj.type || '').toUpperCase();
+
+        const match = rawType.match(/^([A-Z]+)(?:\(([^)]+)\))?/);
+        if (match) {
+            baseType = match[1];
+            lenVal = match[2] || '';
+        }
+
+        if (typeSelect) {
+            const exists = Array.from(typeSelect.options).some(o => o.value === baseType);
+            if (exists) {
+                typeSelect.value = baseType;
+            } else {
+                typeSelect.value = 'VARCHAR';
+            }
+        }
+        if (lengthInput) lengthInput.value = lenVal || (baseType === 'VARCHAR' ? '255' : (baseType === 'INT' ? '11' : ''));
+        if (nullCheck) nullCheck.checked = !!colObj.null;
+        if (defInput) defInput.value = colObj.default !== null ? colObj.default : '';
+        if (aiCheck) aiCheck.checked = !!colObj.is_ai;
+
+        openSubmodal('edit-column');
+        if (nameInput) setTimeout(() => nameInput.focus(), 150);
+    }
+
+    async function submitEditColumn() {
+        if (!activeDbId) return;
+
+        const tableName = document.getElementById('dsg-edit-col-target-table')?.value || '';
+        const oldCol = document.getElementById('dsg-edit-col-old-name')?.value || '';
+        const newCol = (document.getElementById('dsg-edit-col-name')?.value || '').trim();
+        const cType = document.getElementById('dsg-edit-col-type')?.value || 'VARCHAR';
+        const cLen = (document.getElementById('dsg-edit-col-length')?.value || '').trim();
+        const isNull = document.getElementById('dsg-edit-col-null')?.checked ? '1' : '';
+        const defVal = (document.getElementById('dsg-edit-col-default')?.value || '').trim();
+        const isAi = document.getElementById('dsg-edit-col-ai')?.checked ? '1' : '';
+
+        if (!tableName || !oldCol || !newCol) {
+            alert('Nama kolom wajib diisi.');
+            return;
+        }
+
+        const fd = new FormData();
+        fd.append('db_id', activeDbId);
+        fd.append('action', 'modify_column');
+        fd.append('table', tableName);
+        fd.append('old_column', oldCol);
+        fd.append('column_name', newCol);
+        fd.append('type', cType);
+        fd.append('length', cLen);
+        fd.append('is_null', isNull);
+        fd.append('default', defVal);
+        fd.append('is_ai', isAi);
+
+        try {
+            const res = await fetch('api/db-designer.php', {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+
+            if (!data.ok) {
+                alert('Gagal mengubah kolom: ' + (data.error || 'Terjadi kesalahan.'));
+                return;
+            }
+
+            alert(data.pesan || 'Kolom berhasil diperbarui!');
+            closeSubmodal('edit-column');
+            await reloadSchema(true);
+
+            if (document.getElementById('designer-modal-edit-table')?.classList.contains('show')) {
+                openEditTableModal(tableName);
+            }
+
+            if (currentPreviewTable === tableName) {
+                previewTableData(tableName);
+            }
+
+        } catch (err) {
+            alert('Kesalahan jaringan: ' + err.message);
+        }
+    }
+
+    // ------------------------------------------------------------------
     // FITUR 3: TAMBAH KOLOM (ADD COLUMN)
     // ------------------------------------------------------------------
     function openAddColumnModal(tableName) {
@@ -1164,6 +1393,10 @@
             closeSubmodal('add-column');
             await reloadSchema(true);
 
+            if (document.getElementById('designer-modal-edit-table')?.classList.contains('show')) {
+                openEditTableModal(tableName);
+            }
+
             if (currentPreviewTable === tableName) {
                 previewTableData(tableName);
             }
@@ -1203,6 +1436,11 @@
             }
 
             await reloadSchema(true);
+
+            if (document.getElementById('designer-modal-edit-table')?.classList.contains('show')) {
+                openEditTableModal(tableName);
+            }
+
             if (currentPreviewTable === tableName) {
                 previewTableData(tableName);
             }
@@ -1532,7 +1770,7 @@
     }
 
     // ------------------------------------------------------------------
-    // FITUR 6: KELOLA DATA (PREVIEW, INSERT ROW, DELETE ROW)
+    // FITUR 6: KELOLA DATA (PREVIEW, INSERT ROW, EDIT ROW, DELETE ROW)
     // ------------------------------------------------------------------
     async function previewTableData(tableName) {
         if (!elPreviewDrawer || !activeDbId) return;
@@ -1585,7 +1823,7 @@
             const pks = data.pks || [];
 
             let tableHtml = `<table class="designer-preview-table"><thead><tr>`;
-            tableHtml += `<th style="width:50px; text-align:center">Aksi</th>`;
+            tableHtml += `<th style="width:90px; text-align:center">Aksi</th>`;
 
             data.columns.forEach(col => {
                 const isPk = pks.includes(col);
@@ -1601,10 +1839,14 @@
                     data.columns.forEach(c => pkObj[c] = r[c]);
                 }
                 const pkJson = escapeHtml(JSON.stringify(pkObj));
+                const rowJson = escapeHtml(JSON.stringify(r));
 
                 tableHtml += `<tr>`;
                 tableHtml += `
-                    <td style="text-align:center">
+                    <td style="text-align:center; white-space:nowrap">
+                        <button type="button" class="designer-row-edit-btn" title="Edit baris data ini" onclick="window.DB_DESIGNER.openEditRowModal('${escapeHtml(tableName)}', '${pkJson}', '${rowJson}')">
+                            ✏️ Edit
+                        </button>
                         <button type="button" class="designer-row-del-btn" title="Hapus baris ini" onclick="window.DB_DESIGNER.deleteTableRow('${escapeHtml(tableName)}', '${pkJson}')">
                             🗑️
                         </button>
@@ -1774,6 +2016,112 @@
         }
     }
 
+    // ------------------------------------------------------------------
+    // FITUR 6B: EDIT DATA BARIS (UPDATE ROW)
+    // ------------------------------------------------------------------
+    function openEditRowModal(tableName, pkJsonStr, rowJsonStr) {
+        let pkObj = {};
+        let rowObj = {};
+        try {
+            pkObj = JSON.parse(pkJsonStr);
+            rowObj = JSON.parse(rowJsonStr);
+        } catch (e) {
+            alert('Data baris tidak valid.');
+            return;
+        }
+
+        const titleEl = document.getElementById('dsg-edit-row-title');
+        const targetTable = document.getElementById('dsg-edit-row-table-name');
+        const hiddenPk = document.getElementById('dsg-edit-row-pk');
+        const fieldsWrap = document.getElementById('dsg-edit-row-fields-wrap');
+
+        if (titleEl) titleEl.textContent = `Edit Data Baris: ${tableName}`;
+        if (targetTable) targetTable.value = tableName;
+        if (hiddenPk) hiddenPk.value = JSON.stringify(pkObj);
+        if (!fieldsWrap) return;
+
+        fieldsWrap.innerHTML = '';
+
+        const colsMeta = (currentTableMeta && currentTableMeta.columns_meta) ? currentTableMeta.columns_meta : [];
+
+        colsMeta.forEach(col => {
+            const isText = (col.type || '').toLowerCase().includes('text');
+            const isAi = col.is_ai;
+            const currentVal = rowObj[col.name] !== undefined && rowObj[col.name] !== null ? rowObj[col.name] : '';
+
+            const group = document.createElement('div');
+            group.className = 'designer-form-group';
+
+            let labelHtml = `
+                <label class="designer-form-label" style="display:flex; justify-content:space-between; align-items:center">
+                    <span>
+                        ${escapeHtml(col.name)}
+                        ${col.is_pk ? ' <span style="color:#f59e0b" title="Primary Key">🔑</span>' : ''}
+                        ${isAi ? ' <span style="color:#10b981; font-size:11px; font-weight:normal">(Auto Increment)</span>' : ''}
+                    </span>
+                    <span style="font-size:11px; color:#64748b; font-family:monospace">${escapeHtml(col.type)}</span>
+                </label>
+            `;
+
+            let inputHtml = '';
+            if (isText) {
+                inputHtml = `<textarea class="designer-input dsg-edit-row-field" data-col="${escapeHtml(col.name)}" rows="3">${escapeHtml(currentVal)}</textarea>`;
+            } else {
+                inputHtml = `<input type="text" class="designer-input dsg-edit-row-field" data-col="${escapeHtml(col.name)}" value="${escapeHtml(currentVal)}" ${isAi ? 'style="opacity:0.75" title="Nilai Auto Increment"' : ''}>`;
+            }
+
+            group.innerHTML = labelHtml + inputHtml;
+            fieldsWrap.appendChild(group);
+        });
+
+        openSubmodal('edit-row');
+    }
+
+    async function submitEditRow() {
+        if (!activeDbId) return;
+
+        const tableName = document.getElementById('dsg-edit-row-table-name')?.value;
+        const pkStr = document.getElementById('dsg-edit-row-pk')?.value;
+        if (!tableName || !pkStr) return;
+
+        const fields = document.querySelectorAll('#dsg-edit-row-fields-wrap .dsg-edit-row-field');
+        const dataObj = {};
+
+        fields.forEach(f => {
+            const colName = f.dataset.col;
+            if (colName) {
+                dataObj[colName] = f.value;
+            }
+        });
+
+        const fd = new FormData();
+        fd.append('db_id', activeDbId);
+        fd.append('action', 'update_row');
+        fd.append('table', tableName);
+        fd.append('pk', pkStr);
+        fd.append('data', JSON.stringify(dataObj));
+
+        try {
+            const res = await fetch('api/db-designer.php', {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+
+            if (!data.ok) {
+                alert('Gagal memperbarui data: ' + (data.error || 'Terjadi kesalahan.'));
+                return;
+            }
+
+            closeSubmodal('edit-row');
+            refreshCurrentTableData();
+
+        } catch (err) {
+            alert('Kesalahan jaringan: ' + err.message);
+        }
+    }
+
     function closePreview() {
         if (elPreviewDrawer) elPreviewDrawer.classList.remove('show');
     }
@@ -1810,6 +2158,10 @@
         removeCreateColRow,
         submitCreateTable,
         dropTable,
+        openEditTableModal,
+        submitRenameTable,
+        openEditColumnModal,
+        submitEditColumn,
         openAddColumnModal,
         onColTypeChange,
         submitAddColumn,
@@ -1825,6 +2177,8 @@
         toggleInferredRelations,
         openInsertRowModal,
         submitInsertRow,
+        openEditRowModal,
+        submitEditRow,
         deleteTableRow,
         closeSubmodal,
         reload: () => reloadSchema(false)
