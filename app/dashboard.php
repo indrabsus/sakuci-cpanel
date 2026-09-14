@@ -19,6 +19,39 @@ if (isset($_GET['pesan']) && str_contains((string) $_GET['pesan'], '|')) {
     }
 }
 
+// Mengambil informasi commit terakhir dari repositori lokal beserta timestamp
+function get_project_commit(string $localPath, string $gitUrl = ''): ?array
+{
+    if (!is_dir($localPath . '/.git')) {
+        return null;
+    }
+    $cmd = sprintf(
+        "cd %s && git -c safe.directory=* log -1 --format='%%h|%%s|%%an|%%cr|%%H|%%ct' 2>/dev/null",
+        escapeshellarg($localPath)
+    );
+    $out = @shell_exec($cmd);
+    if (!$out || trim($out) === '') {
+        return null;
+    }
+    $parts = explode('|', trim($out), 6);
+    if (count($parts) < 4) {
+        return null;
+    }
+    $url = '';
+    if (!empty($gitUrl) && preg_match('#github\.com[:/]([^/]+)/([^/\.]+)(\.git)?#i', $gitUrl, $m)) {
+        $url = 'https://github.com/' . $m[1] . '/' . $m[2] . '/commit/' . ($parts[4] ?? $parts[0]);
+    }
+    return [
+        'short'     => $parts[0],
+        'subject'   => $parts[1],
+        'author'    => $parts[2],
+        'relative'  => $parts[3],
+        'hash'      => $parts[4] ?? $parts[0],
+        'timestamp' => isset($parts[5]) ? (int) $parts[5] : 0,
+        'url'       => $url,
+    ];
+}
+
 // Admin melihat milik semua orang; siswa hanya miliknya sendiri.
 $projects = [];
 $sql = "SELECT p.*, u.username AS owner FROM projects p
@@ -28,7 +61,6 @@ $sql = "SELECT p.*, u.username AS owner FROM projects p
 $result = $conn->query($sql);
 if ($result) {
     while ($row = $result->fetch_assoc()) {
-        // Pastikan setiap project memiliki webhook_secret
         if (empty($row['webhook_secret'])) {
             $newSecret = bin2hex(random_bytes(16));
             $pId = intval($row['id']);
@@ -36,6 +68,67 @@ if ($result) {
             $row['webhook_secret'] = $newSecret;
         }
         $projects[] = $row;
+    }
+}
+
+// Simpan total seluruh project sebelum difilter
+$total_projects_count = count($projects);
+
+// Hitung metadata commit & aktivitas git untuk setiap project
+foreach ($projects as &$p) {
+    $cloned = is_dir($p['local_path']);
+    $commit = $cloned ? get_project_commit($p['local_path'], $p['git_url']) : null;
+    $p['cloned'] = $cloned;
+    $p['commit'] = $commit;
+    $lpTime = !empty($p['last_pull']) ? strtotime($p['last_pull']) : 0;
+    $commitTime = $commit['timestamp'] ?? 0;
+    $p['git_time'] = max($lpTime, $commitTime);
+}
+unset($p);
+
+// Filter & Sorting khusus Admin
+$q = '';
+$sort = 'git'; // default: git terbaru
+if ($admin) {
+    $q = trim((string) ($_GET['q'] ?? ''));
+    $sort = trim((string) ($_GET['sort'] ?? 'git'));
+
+    // Filter pencarian berdasarkan nama pengguna, nama project, atau domain
+    if ($q !== '') {
+        $qLower = strtolower($q);
+        $projects = array_values(array_filter($projects, function ($p) use ($qLower) {
+            $owner = strtolower($p['owner'] ?? '');
+            $name = strtolower($p['name'] ?? '');
+            $domain = strtolower($p['domain'] ?? '');
+            return str_contains($owner, $qLower) || str_contains($name, $qLower) || str_contains($domain, $qLower);
+        }));
+    }
+
+    // Pilihan Sorting
+    if ($sort === 'git') {
+        // Urutkan berdasarkan aktivitas Git terbaru (last pull atau commit)
+        usort($projects, function ($a, $b) {
+            if ($b['git_time'] !== $a['git_time']) {
+                return $b['git_time'] <=> $a['git_time'];
+            }
+            return strtotime($b['created_at']) <=> strtotime($a['created_at']);
+        });
+    } elseif ($sort === 'terlama') {
+        // Project terlama
+        usort($projects, function ($a, $b) {
+            return strtotime($a['created_at']) <=> strtotime($b['created_at']);
+        });
+    } elseif ($sort === 'owner') {
+        // Berdasarkan nama pengguna A-Z
+        usort($projects, function ($a, $b) {
+            return strcasecmp($a['owner'], $b['owner']);
+        });
+    } else {
+        // Project terbaru berdasarkan waktu dibuat
+        $sort = 'terbaru';
+        usort($projects, function ($a, $b) {
+            return strtotime($b['created_at']) <=> strtotime($a['created_at']);
+        });
     }
 }
 
@@ -60,37 +153,7 @@ foreach ($projects as $p) {
     }
 }
 
-// Mengambil informasi commit terakhir dari repositori lokal
-function get_project_commit(string $localPath, string $gitUrl = ''): ?array
-{
-    if (!is_dir($localPath . '/.git')) {
-        return null;
-    }
-    $cmd = sprintf(
-        "cd %s && git -c safe.directory=* log -1 --format='%%h|%%s|%%an|%%cr|%%H' 2>/dev/null",
-        escapeshellarg($localPath)
-    );
-    $out = @shell_exec($cmd);
-    if (!$out || trim($out) === '') {
-        return null;
-    }
-    $parts = explode('|', trim($out), 5);
-    if (count($parts) < 4) {
-        return null;
-    }
-    $url = '';
-    if (!empty($gitUrl) && preg_match('#github\.com[:/]([^/]+)/([^/\.]+)(\.git)?#i', $gitUrl, $m)) {
-        $url = 'https://github.com/' . $m[1] . '/' . $m[2] . '/commit/' . ($parts[4] ?? $parts[0]);
-    }
-    return [
-        'short'    => $parts[0],
-        'subject'  => $parts[1],
-        'author'   => $parts[2],
-        'relative' => $parts[3],
-        'hash'     => $parts[4] ?? $parts[0],
-        'url'      => $url,
-    ];
-}
+
 
 // Tombol aksi di topbar: Admin tidak bisa menambah project. Siswa hanya bisa jika kuota < 1.
 $aksiTopbar = [];
@@ -158,6 +221,41 @@ layout_start(
         </div>
     </div>
 
+    <?php if ($admin): ?>
+        <!-- Toolbar Filter & Search Khusus Role Admin -->
+        <div class="admin-project-toolbar">
+            <form method="GET" action="dashboard.php" id="form-admin-filter" class="admin-filter-form">
+                <div class="filter-search-wrap">
+                    <span class="filter-icon">🔍</span>
+                    <input type="text" 
+                           name="q" 
+                           id="filter-search-input" 
+                           class="filter-search-input" 
+                           placeholder="Cari nama pengguna / siswa / project..." 
+                           value="<?php echo htmlspecialchars($q); ?>" 
+                           autocomplete="off">
+                    <?php if ($q !== ''): ?>
+                        <a href="dashboard.php<?php echo $sort !== 'git' ? '?sort=' . urlencode($sort) : ''; ?>" class="filter-clear-btn" title="Hapus pencarian">✕</a>
+                    <?php endif; ?>
+                </div>
+
+                <div class="filter-sort-wrap">
+                    <label for="filter-sort-select" class="filter-sort-label">Urutan:</label>
+                    <select name="sort" id="filter-sort-select" class="filter-sort-select" onchange="this.form.submit()">
+                        <option value="git" <?php echo $sort === 'git' ? 'selected' : ''; ?>>⚡ Git Terbaru (Aktivitas)</option>
+                        <option value="terbaru" <?php echo $sort === 'terbaru' ? 'selected' : ''; ?>>🆕 Project Terbaru (Dibuat)</option>
+                        <option value="terlama" <?php echo $sort === 'terlama' ? 'selected' : ''; ?>>⏳ Project Terlama</option>
+                        <option value="owner" <?php echo $sort === 'owner' ? 'selected' : ''; ?>>👤 Nama Pengguna (A - Z)</option>
+                    </select>
+                </div>
+            </form>
+
+            <div class="filter-count-badge">
+                Menampilkan <strong id="filter-shown-count"><?php echo count($projects); ?></strong> dari <?php echo $total_projects_count; ?> project
+            </div>
+        </div>
+    <?php endif; ?>
+
     <?php if (!$projects): ?>
         <div class="empty">
             <?php if ($admin): ?>
@@ -168,15 +266,19 @@ layout_start(
             <?php endif; ?>
         </div>
     <?php else: ?>
-        <div class="card-b" style="display:grid; gap:.85rem">
+        <div id="empty-filter-message" class="empty" style="display:none; margin:1rem">
+            <p style="margin-bottom:.5rem">Tidak ada project yang cocok dengan pencarian.</p>
+            <a href="dashboard.php" class="btn btn-2 btn-sm">Reset Pencarian</a>
+        </div>
+        <div class="card-b" id="projects-container" style="display:grid; gap:.85rem">
             <?php foreach ($projects as $project): ?>
                 <?php
-                $cloned = is_dir($project['local_path']);
+                $cloned = $project['cloned'] ?? is_dir($project['local_path']);
                 $hasToken = !empty($project['github_token']);
                 $url = SITE_DOMAIN !== ''
                     ? 'https://' . basename($project['local_path']) . '.' . SITE_DOMAIN
                     : '';
-                $commit = $cloned ? get_project_commit($project['local_path'], $project['git_url']) : null;
+                $commit = $project['commit'] ?? ($cloned ? get_project_commit($project['local_path'], $project['git_url']) : null);
                 $modalData = [
                     'id'       => (int) $project['id'],
                     'name'     => $project['name'],
@@ -186,7 +288,11 @@ layout_start(
                     'gitUrl'   => $project['git_url'],
                 ];
                 ?>
-                <div class="proyek" data-project="<?php echo $project['id']; ?>">
+                <div class="proyek" 
+                     data-project="<?php echo $project['id']; ?>"
+                     data-owner="<?php echo strtolower(htmlspecialchars($project['owner'])); ?>"
+                     data-name="<?php echo strtolower(htmlspecialchars($project['name'])); ?>"
+                     data-domain="<?php echo strtolower(htmlspecialchars($project['domain'] ?? '')); ?>">
                     <div class="proyek-h">
                         <div>
                             <div class="proyek-n">
@@ -362,5 +468,43 @@ layout_start(
         </div>
     </div>
 </div>
+
+<?php if ($admin): ?>
+<script>
+(function() {
+    const searchInput = document.getElementById('filter-search-input');
+    const projectsContainer = document.getElementById('projects-container');
+    const shownCountEl = document.getElementById('filter-shown-count');
+    const emptyMsg = document.getElementById('empty-filter-message');
+
+    if (searchInput && projectsContainer) {
+        searchInput.addEventListener('input', function() {
+            const q = this.value.trim().toLowerCase();
+            const cards = projectsContainer.querySelectorAll('.proyek');
+            let matchCount = 0;
+
+            cards.forEach(card => {
+                const owner = card.getAttribute('data-owner') || '';
+                const name = card.getAttribute('data-name') || '';
+                const domain = card.getAttribute('data-domain') || '';
+                
+                const match = (q === '') || owner.includes(q) || name.includes(q) || domain.includes(q);
+                if (match) {
+                    card.style.display = '';
+                    matchCount++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+
+            if (shownCountEl) shownCountEl.textContent = matchCount;
+            if (emptyMsg) {
+                emptyMsg.style.display = (matchCount === 0) ? 'block' : 'none';
+            }
+        });
+    }
+})();
+</script>
+<?php endif; ?>
 
 <?php layout_end(true); ?>
