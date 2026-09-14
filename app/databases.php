@@ -512,7 +512,7 @@ layout_start('Database', $isAdmin ? 'Mode Pemantauan &mdash; Memantau seluruh da
                     </div>
                     <div style="display:flex; gap:.45rem; align-items:center; flex-wrap:wrap">
                         <button type="button" class="git-btn" style="background:#0284c7; color:#fff; border-color:#0369a1; font-weight:600; display:inline-flex; align-items:center; gap:5px;" onclick="openDatabaseDesigner(<?php echo (int) $db['id']; ?>, '<?php echo htmlspecialchars($db['db_name'], ENT_QUOTES); ?>')">
-                            📐 Lihat Tabel (Designer)
+                            📐 Lihat Tabel
                         </button>
                         <?php if (PHPMYADMIN_URL !== ''): ?>
                             <a class="git-btn" target="_blank" rel="noopener noreferrer"
@@ -559,11 +559,6 @@ DB_PASSWORD=<?php echo htmlspecialchars($db['db_pass']); ?></pre>
                 <?php endif; ?>
 
                 <div class="git-actions" style="margin-top:.85rem; padding-top:.85rem; border-top:1px solid var(--line-soft)">
-                    <button type="button" class="git-btn" style="background:#0284c7; color:#fff; border-color:#0369a1; font-weight:600; display:inline-flex; align-items:center; gap:5px"
-                            onclick="openDatabaseDesigner(<?php echo (int) $db['id']; ?>, '<?php echo htmlspecialchars($db['db_name'], ENT_QUOTES); ?>')">
-                        📐 Lihat Tabel
-                    </button>
-
                     <form method="POST" enctype="multipart/form-data" class="alat-impor"
                           onsubmit="return this.berkas.files.length > 0;">
                         <input type="hidden" name="action" value="impor">
