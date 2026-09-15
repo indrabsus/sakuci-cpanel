@@ -52,6 +52,49 @@ $dbConn = $sambung['conn'];
 $dbConn->set_charset('utf8mb4');
 
 // Fungsi pembantu validasi nama identifier SQL
+
+// Format tipe kolom dan panjang/nilai SQL (termasuk ENUM)
+function format_sql_column_type(mysqli $dbConn, string $cType, string $cLength): string {
+    $cType = strtoupper(trim($cType));
+    if ($cType === 'ENUM') {
+        $raw = trim($cLength);
+        if (str_starts_with($raw, '(') && str_ends_with($raw, ')')) {
+            $raw = substr($raw, 1, -1);
+        }
+        $items = [];
+        if ($raw !== '') {
+            if (preg_match_all("/(?:'((?:\\\'|[^'])*)'|\"((?:\\\"|[^\"])*)\"|([^,]+))/", $raw, $matches, PREG_SET_ORDER)) {
+                foreach ($matches as $m) {
+                    $val = '';
+                    if (isset($m[1]) && $m[1] !== '') {
+                        $val = stripslashes($m[1]);
+                    } elseif (isset($m[2]) && $m[2] !== '') {
+                        $val = stripslashes($m[2]);
+                    } elseif (isset($m[3])) {
+                        $val = trim($m[3]);
+                    }
+                    if ($val !== '') {
+                        $escaped = $dbConn->real_escape_string($val);
+                        $items[] = "'{$escaped}'";
+                    }
+                }
+            }
+        }
+        if (empty($items)) {
+            $items = ["'default'"];
+        }
+        return "ENUM(" . implode(',', $items) . ")";
+    }
+
+    $typeWithLen = $cType;
+    if ($cLength !== '' && preg_match('/^[0-9]+(,[0-9]+)?$/', $cLength)) {
+        $typeWithLen .= "({$cLength})";
+    } elseif ($cType === 'VARCHAR' && $cLength === '') {
+        $typeWithLen .= "(255)";
+    }
+    return $typeWithLen;
+}
+
 function validate_sql_ident($ident, $maxLen = 64) {
     if (!is_string($ident) || !preg_match('/^[a-zA-Z0-9_]{1,' . $maxLen . '}$/', $ident)) {
         return false;
@@ -267,7 +310,7 @@ try {
             exit;
         }
 
-        $allowedTypes = ['INT', 'BIGINT', 'TINYINT', 'SMALLINT', 'VARCHAR', 'CHAR', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'DECIMAL', 'FLOAT', 'DOUBLE', 'DATE', 'DATETIME', 'TIMESTAMP', 'TIME', 'BOOLEAN', 'JSON'];
+        $allowedTypes = ['INT', 'BIGINT', 'TINYINT', 'SMALLINT', 'VARCHAR', 'CHAR', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'DECIMAL', 'FLOAT', 'DOUBLE', 'DATE', 'DATETIME', 'TIMESTAMP', 'TIME', 'BOOLEAN', 'JSON', 'ENUM'];
         $colDefs = [];
         $pkCols = [];
 
@@ -284,12 +327,7 @@ try {
             }
 
             $cLength = trim((string) ($col['length'] ?? ''));
-            $typeWithLen = $cType;
-            if ($cLength !== '' && preg_match('/^[0-9]+(,[0-9]+)?$/', $cLength)) {
-                $typeWithLen .= "({$cLength})";
-            } elseif ($cType === 'VARCHAR' && $cLength === '') {
-                $typeWithLen .= "(255)";
-            }
+            $typeWithLen = format_sql_column_type($dbConn, $cType, $cLength);
 
             $nullSql = (!empty($col['is_null']) || (isset($col['null']) && $col['null'] === true)) ? "NULL" : "NOT NULL";
             $extraSql = "";
@@ -386,18 +424,13 @@ try {
         }
 
         $cType = strtoupper(trim($_POST['type'] ?? 'VARCHAR'));
-        $allowedTypes = ['INT', 'BIGINT', 'TINYINT', 'SMALLINT', 'VARCHAR', 'CHAR', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'DECIMAL', 'FLOAT', 'DOUBLE', 'DATE', 'DATETIME', 'TIMESTAMP', 'TIME', 'BOOLEAN', 'JSON'];
+        $allowedTypes = ['INT', 'BIGINT', 'TINYINT', 'SMALLINT', 'VARCHAR', 'CHAR', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'DECIMAL', 'FLOAT', 'DOUBLE', 'DATE', 'DATETIME', 'TIMESTAMP', 'TIME', 'BOOLEAN', 'JSON', 'ENUM'];
         if (!in_array($cType, $allowedTypes, true)) {
             $cType = 'VARCHAR';
         }
 
         $cLength = trim((string) ($_POST['length'] ?? ''));
-        $typeWithLen = $cType;
-        if ($cLength !== '' && preg_match('/^[0-9]+(,[0-9]+)?$/', $cLength)) {
-            $typeWithLen .= "({$cLength})";
-        } elseif ($cType === 'VARCHAR' && $cLength === '') {
-            $typeWithLen .= "(255)";
-        }
+        $typeWithLen = format_sql_column_type($dbConn, $cType, $cLength);
 
         $nullSql = !empty($_POST['is_null']) ? "NULL" : "NOT NULL";
         $defaultSql = "";
@@ -466,18 +499,13 @@ try {
         }
 
         $cType = strtoupper(trim($_POST['type'] ?? 'VARCHAR'));
-        $allowedTypes = ['INT', 'BIGINT', 'TINYINT', 'SMALLINT', 'VARCHAR', 'CHAR', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'DECIMAL', 'FLOAT', 'DOUBLE', 'DATE', 'DATETIME', 'TIMESTAMP', 'TIME', 'BOOLEAN', 'JSON'];
+        $allowedTypes = ['INT', 'BIGINT', 'TINYINT', 'SMALLINT', 'VARCHAR', 'CHAR', 'TEXT', 'MEDIUMTEXT', 'LONGTEXT', 'DECIMAL', 'FLOAT', 'DOUBLE', 'DATE', 'DATETIME', 'TIMESTAMP', 'TIME', 'BOOLEAN', 'JSON', 'ENUM'];
         if (!in_array($cType, $allowedTypes, true)) {
             $cType = 'VARCHAR';
         }
 
         $cLength = trim((string) ($_POST['length'] ?? ''));
-        $typeWithLen = $cType;
-        if ($cLength !== '' && preg_match('/^[0-9]+(,[0-9]+)?$/', $cLength)) {
-            $typeWithLen .= "({$cLength})";
-        } elseif ($cType === 'VARCHAR' && $cLength === '') {
-            $typeWithLen .= "(255)";
-        }
+        $typeWithLen = format_sql_column_type($dbConn, $cType, $cLength);
 
         $nullSql = !empty($_POST['is_null']) ? "NULL" : "NOT NULL";
         $defaultSql = "";

@@ -868,6 +868,9 @@
             lenEl.value = '20';
         } else if (val === 'DECIMAL') {
             if (!lenEl.value || lenEl.value === '255' || lenEl.value === '11') lenEl.value = '10,2';
+        } else if (val === 'ENUM') {
+            if (!lenEl.value || ['255', '11', '20', '10,2'].includes(lenEl.value)) lenEl.value = "'aktif','nonaktif'";
+            lenEl.placeholder = "'opsi1','opsi2'";
         } else if (['TEXT', 'DATE', 'DATETIME', 'TIMESTAMP', 'JSON', 'BOOLEAN', 'TIME'].includes(val)) {
             lenEl.value = '';
         }
@@ -909,6 +912,7 @@
                     <option value="BIGINT" ${curType === 'BIGINT' ? 'selected' : ''}>BIGINT</option>
                     <option value="TEXT" ${curType === 'TEXT' ? 'selected' : ''}>TEXT</option>
                     <option value="DECIMAL" ${curType === 'DECIMAL' ? 'selected' : ''}>DECIMAL</option>
+                    <option value="ENUM" ${curType === 'ENUM' ? 'selected' : ''}>ENUM</option>
                     <option value="DATE" ${curType === 'DATE' ? 'selected' : ''}>DATE</option>
                     <option value="DATETIME" ${curType === 'DATETIME' ? 'selected' : ''}>DATETIME</option>
                     <option value="TIMESTAMP" ${curType === 'TIMESTAMP' ? 'selected' : ''}>TIMESTAMP</option>
@@ -1264,11 +1268,11 @@
 
         let baseType = 'VARCHAR';
         let lenVal = '';
-        const rawType = (colObj.type || '').toUpperCase();
+        const rawType = (colObj.type || '').trim();
 
-        const match = rawType.match(/^([A-Z]+)(?:\(([^)]+)\))?/);
+        const match = rawType.match(/^([A-Za-z]+)(?:\((.*)\))?$/);
         if (match) {
-            baseType = match[1];
+            baseType = match[1].toUpperCase();
             lenVal = match[2] || '';
         }
 
@@ -2011,7 +2015,18 @@
             `;
 
             let inputHtml = '';
-            if (isText) {
+            const isEnum = (col.type || '').toLowerCase().startsWith('enum(');
+            if (isEnum) {
+                const enumMatch = (col.type || '').match(/^enum\((.*)\)$/i);
+                let enumOptions = [];
+                if (enumMatch) {
+                    enumOptions = (enumMatch[1].match(/'([^']*)'|"([^"]*)"|([^,]+)/g) || [])
+                        .map(s => s.replace(/^['"]|['"]$/g, '').trim());
+                }
+                const nullOpt = col.null ? '<option value="">-- NULL / Kosong --</option>' : '';
+                const optsHtml = enumOptions.map(opt => `<option value="${escapeHtml(opt)}" ${col.default === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('');
+                inputHtml = `<select class="designer-select dsg-insert-field" data-col="${escapeHtml(col.name)}">${nullOpt}${optsHtml}</select>`;
+            } else if (isText) {
                 inputHtml = `<textarea class="designer-input dsg-insert-field" data-col="${escapeHtml(col.name)}" rows="3" placeholder="${escapeHtml(placeholder)}"></textarea>`;
             } else {
                 inputHtml = `<input type="text" class="designer-input dsg-insert-field" data-col="${escapeHtml(col.name)}" placeholder="${escapeHtml(placeholder)}" ${isAi ? 'style="opacity:0.75"' : ''}>`;
@@ -2112,7 +2127,18 @@
             `;
 
             let inputHtml = '';
-            if (isText) {
+            const isEnum = (col.type || '').toLowerCase().startsWith('enum(');
+            if (isEnum) {
+                const enumMatch = (col.type || '').match(/^enum\((.*)\)$/i);
+                let enumOptions = [];
+                if (enumMatch) {
+                    enumOptions = (enumMatch[1].match(/'([^']*)'|"([^"]*)"|([^,]+)/g) || [])
+                        .map(s => s.replace(/^['"]|['"]$/g, '').trim());
+                }
+                const nullOpt = col.null ? `<option value="" ${currentVal === '' ? 'selected' : ''}>-- NULL / Kosong --</option>` : '';
+                const optsHtml = enumOptions.map(opt => `<option value="${escapeHtml(opt)}" ${currentVal === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>`).join('');
+                inputHtml = `<select class="designer-select dsg-edit-row-field" data-col="${escapeHtml(col.name)}">${nullOpt}${optsHtml}</select>`;
+            } else if (isText) {
                 inputHtml = `<textarea class="designer-input dsg-edit-row-field" data-col="${escapeHtml(col.name)}" rows="3">${escapeHtml(currentVal)}</textarea>`;
             } else {
                 inputHtml = `<input type="text" class="designer-input dsg-edit-row-field" data-col="${escapeHtml(col.name)}" value="${escapeHtml(currentVal)}" ${isAi ? 'style="opacity:0.75" title="Nilai Auto Increment"' : ''}>`;

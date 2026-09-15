@@ -168,6 +168,7 @@
                                 <option value="BIGINT">BIGINT</option>
                                 <option value="TEXT">TEXT</option>
                                 <option value="DECIMAL">DECIMAL</option>
+                                <option value="ENUM">ENUM</option>
                                 <option value="DATE">DATE</option>
                                 <option value="DATETIME">DATETIME</option>
                                 <option value="TIMESTAMP">TIMESTAMP</option>
@@ -177,7 +178,7 @@
                         </div>
                         <div class="designer-form-group">
                             <label class="designer-form-label">Panjang / Nilai:</label>
-                            <input type="text" id="dsg-add-col-length" class="designer-input" value="255">
+                            <input type="text" id="dsg-add-col-length" class="designer-input" value="255" placeholder="255 atau 'aktif','nonaktif'">
                         </div>
                     </div>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
@@ -391,6 +392,7 @@
                                 <option value="BIGINT">BIGINT</option>
                                 <option value="TEXT">TEXT</option>
                                 <option value="DECIMAL">DECIMAL</option>
+                                <option value="ENUM">ENUM</option>
                                 <option value="DATE">DATE</option>
                                 <option value="DATETIME">DATETIME</option>
                                 <option value="TIMESTAMP">TIMESTAMP</option>
@@ -400,7 +402,7 @@
                         </div>
                         <div class="designer-form-group">
                             <label class="designer-form-label">Panjang / Nilai:</label>
-                            <input type="text" id="dsg-edit-col-length" class="designer-input" value="255">
+                            <input type="text" id="dsg-edit-col-length" class="designer-input" value="255" placeholder="255 atau 'aktif','nonaktif'">
                         </div>
                     </div>
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
