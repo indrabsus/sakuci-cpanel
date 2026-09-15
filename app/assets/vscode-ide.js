@@ -693,6 +693,97 @@
         }
     }
 
+
+    // ---------------- Helper Expand All Parents ---------------- //
+    function expandAllParents(path) {
+        if (!path) return;
+        let curr = '';
+        path.split('/').forEach(part => {
+            if (!part) return;
+            curr = curr ? curr + '/' + part : part;
+            expandedFolders.add(curr);
+        });
+    }
+
+    // ---------------- Context Menu (Klik Kanan) ---------------- //
+    let contextMenuEl = null;
+
+    function hideContextMenu() {
+        if (contextMenuEl && contextMenuEl.parentNode) {
+            contextMenuEl.parentNode.removeChild(contextMenuEl);
+            contextMenuEl = null;
+        }
+    }
+
+    document.addEventListener('click', hideContextMenu);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') hideContextMenu();
+    });
+
+    function showContextMenu(x, y, node) {
+        hideContextMenu();
+        contextMenuEl = document.createElement('div');
+        contextMenuEl.className = 'vsc-context-menu';
+
+        if (node.isDir) {
+            contextMenuEl.innerHTML = `
+                <div class="vsc-context-menu-item" data-action="new-file">
+                    <span style="font-size:13px">📄</span> <span>Buat Berkas Baru (Add File)...</span>
+                </div>
+                <div class="vsc-context-menu-item" data-action="new-folder">
+                    <span style="font-size:13px">📁</span> <span>Buat Folder Baru (Add Folder)...</span>
+                </div>
+                <div class="vsc-context-menu-sep"></div>
+                <div class="vsc-context-menu-item" data-action="rename">
+                    <span style="font-size:13px">✏️</span> <span>Ganti Nama...</span>
+                </div>
+                <div class="vsc-context-menu-item" data-action="delete" style="color:#f87171">
+                    <span style="font-size:13px">🗑️</span> <span>Hapus Folder</span>
+                </div>
+            `;
+        } else {
+            contextMenuEl.innerHTML = `
+                <div class="vsc-context-menu-item" data-action="open">
+                    <span style="font-size:13px">📄</span> <span>Buka Berkas</span>
+                </div>
+                <div class="vsc-context-menu-sep"></div>
+                <div class="vsc-context-menu-item" data-action="rename">
+                    <span style="font-size:13px">✏️</span> <span>Ganti Nama...</span>
+                </div>
+                <div class="vsc-context-menu-item" data-action="delete" style="color:#f87171">
+                    <span style="font-size:13px">🗑️</span> <span>Hapus Berkas</span>
+                </div>
+            `;
+        }
+
+        contextMenuEl.addEventListener('click', (e) => {
+            const menuItem = e.target.closest('.vsc-context-menu-item');
+            if (!menuItem) return;
+            const action = menuItem.dataset.action;
+            hideContextMenu();
+
+            if (action === 'new-file') {
+                promptNewFile(node.path);
+            } else if (action === 'new-folder') {
+                promptNewFolder(node.path);
+            } else if (action === 'rename') {
+                promptRename(node.path, node.name);
+            } else if (action === 'delete') {
+                promptDelete(node.path, node.isDir);
+            } else if (action === 'open') {
+                openFile(node.path);
+            }
+        });
+
+        document.body.appendChild(contextMenuEl);
+
+        const rect = contextMenuEl.getBoundingClientRect();
+        const posX = Math.min(x, window.innerWidth - rect.width - 10);
+        const posY = Math.min(y, window.innerHeight - rect.height - 10);
+        contextMenuEl.style.left = `${Math.max(10, posX)}px`;
+        contextMenuEl.style.top = `${Math.max(10, posY)}px`;
+    }
+
     function renderTree() {
         if (!elTree) return;
         elTree.innerHTML = '';
@@ -715,6 +806,9 @@
             item.dataset.path = node.path;
             item.style.paddingLeft = `${depth * 14 + 10}px`;
 
+            const safePath = (node.path || '').replace(/'/g, "\\'");
+            const safeName = escapeHtml(node.name || '').replace(/'/g, "\\'");
+
             if (node.isDir) {
                 const isOpen = expandedFolders.has(node.path);
                 item.innerHTML = `
@@ -722,9 +816,10 @@
                     <span class="vsc-file-icon icon-folder">📁</span>
                     <span class="vsc-tree-name">${escapeHtml(node.name)}</span>
                     <div class="vsc-item-actions">
-                        <button type="button" class="vsc-icon-btn" title="Buat Berkas di Sini" onclick="window.VSC_IDE.promptNewFile('${node.path}', event)">+📄</button>
-                        <button type="button" class="vsc-icon-btn" title="Ganti Nama" onclick="window.VSC_IDE.promptRename('${node.path}', '${escapeHtml(node.name)}', event)">✏️</button>
-                        <button type="button" class="vsc-icon-btn" title="Hapus" onclick="window.VSC_IDE.promptDelete('${node.path}', true, event)">🗑️</button>
+                        <button type="button" class="vsc-icon-btn" title="Buat Berkas di Sini (Add File)" onclick="window.VSC_IDE.promptNewFile('${safePath}', event)">+📄</button>
+                        <button type="button" class="vsc-icon-btn" title="Buat Folder di Sini (Add Folder)" onclick="window.VSC_IDE.promptNewFolder('${safePath}', event)">+📁</button>
+                        <button type="button" class="vsc-icon-btn" title="Ganti Nama (Rename)" onclick="window.VSC_IDE.promptRename('${safePath}', '${safeName}', event)">✏️</button>
+                        <button type="button" class="vsc-icon-btn" title="Hapus Folder" onclick="window.VSC_IDE.promptDelete('${safePath}', true, event)">🗑️</button>
                     </div>
                 `;
 
@@ -738,6 +833,12 @@
                     renderTree();
                 });
 
+                item.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showContextMenu(e.clientX, e.clientY, node);
+                });
+
                 container.appendChild(item);
 
                 if (isOpen && node.children && node.children.length > 0) {
@@ -746,9 +847,16 @@
                     const empty = document.createElement('div');
                     empty.className = 'vsc-tree-item';
                     empty.style.paddingLeft = `${(depth + 1) * 14 + 10}px`;
-                    empty.style.color = '#666';
-                    empty.style.fontStyle = 'italic';
-                    empty.textContent = '(kosong)';
+                    empty.style.display = 'flex';
+                    empty.style.alignItems = 'center';
+                    empty.style.gap = '6px';
+                    empty.innerHTML = `
+                        <span style="color:#777; font-style:italic; font-size:11.5px">(kosong)</span>
+                        <div class="vsc-item-actions" style="display:inline-flex">
+                            <button type="button" class="vsc-icon-btn" style="display:inline-flex; padding:1px 5px; font-size:11px; border:1px solid rgba(255,255,255,0.1); border-radius:3px" title="Buat Berkas di Sini" onclick="window.VSC_IDE.promptNewFile('${safePath}', event)">+📄 Berkas</button>
+                            <button type="button" class="vsc-icon-btn" style="display:inline-flex; padding:1px 5px; font-size:11px; border:1px solid rgba(255,255,255,0.1); border-radius:3px" title="Buat Folder di Sini" onclick="window.VSC_IDE.promptNewFolder('${safePath}', event)">+📁 Folder</button>
+                        </div>
+                    `;
                     container.appendChild(empty);
                 }
             } else {
@@ -761,14 +869,20 @@
                     <span class="vsc-tree-name">${escapeHtml(node.name)}</span>
                     ${gitBadgeHtml}
                     <div class="vsc-item-actions">
-                        <button type="button" class="vsc-icon-btn" title="Ganti Nama" onclick="window.VSC_IDE.promptRename('${node.path}', '${escapeHtml(node.name)}', event)">✏️</button>
-                        <button type="button" class="vsc-icon-btn" title="Hapus" onclick="window.VSC_IDE.promptDelete('${node.path}', false, event)">🗑️</button>
+                        <button type="button" class="vsc-icon-btn" title="Ganti Nama (Rename)" onclick="window.VSC_IDE.promptRename('${safePath}', '${safeName}', event)">✏️</button>
+                        <button type="button" class="vsc-icon-btn" title="Hapus Berkas" onclick="window.VSC_IDE.promptDelete('${safePath}', false, event)">🗑️</button>
                     </div>
                 `;
 
                 item.addEventListener('click', (e) => {
                     if (e.target.closest('.vsc-item-actions')) return;
                     openFile(node.path);
+                });
+
+                item.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showContextMenu(e.clientX, e.clientY, node);
                 });
 
                 container.appendChild(item);
@@ -828,7 +942,7 @@
             });
             const data = await res.json();
             if (data.status === 'ok') {
-                if (parentPath) expandedFolders.add(parentPath);
+                if (parentPath) expandAllParents(parentPath);
                 await loadTree();
                 openFile(data.path);
                 fetchGitStatus();
@@ -860,8 +974,8 @@
             });
             const data = await res.json();
             if (data.status === 'ok') {
-                if (parentPath) expandedFolders.add(parentPath);
-                expandedFolders.add(data.path);
+                if (parentPath) expandAllParents(parentPath);
+                expandAllParents(data.path);
                 await loadTree();
             } else {
                 alert('Gagal membuat folder: ' + (data.error || 'Terjadi kesalahan'));
