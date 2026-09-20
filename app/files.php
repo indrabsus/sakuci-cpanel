@@ -22,6 +22,8 @@ if (!is_dir($root)) {
     exit('Folder project belum ada. Jalankan Clone lebih dulu.');
 }
 
+$initialPath = trim($_GET['path'] ?? '');
+
 $hasToken = !empty($project['github_token']);
 $isAdmin = is_admin($user);
 $ownerStmt = $conn->prepare("SELECT role, username FROM users WHERE id = ?");
