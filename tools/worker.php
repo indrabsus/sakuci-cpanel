@@ -148,7 +148,7 @@ while ($processed < MAX_PER_RUN) {
     $processed++;
 
     $stmt = $conn->prepare(
-        "SELECT j.action, j.commit_message, p.git_url, p.git_branch, p.local_path, p.github_token, u.username
+        "SELECT j.action, j.commit_message, p.git_url, p.git_branch, p.local_path, p.github_token, u.username, u.role
            FROM job_queue j
            JOIN projects p ON p.id = j.project_id
            JOIN users u ON u.id = j.user_id
@@ -165,6 +165,7 @@ while ($processed < MAX_PER_RUN) {
 
     $path   = $job['local_path'];
     $branch = $job['git_branch'] ?: 'main';
+    $isBarcodeUser = (($job['role'] ?? '') === 'barcode' || ($job['username'] ?? '') === 'barcode');
 
     if ($job['action'] === 'clone') {
         $parent = dirname($path);
@@ -187,7 +188,7 @@ while ($processed < MAX_PER_RUN) {
             $parent
         );
 
-        if ($code === 0 && WAJIB_SAKUCI) {
+        if ($code === 0 && WAJIB_SAKUCI && !$isBarcodeUser) {
             $cek = periksa_sakuci($sementara);
 
             if (!$cek['ok']) {

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
   username   varchar(50)  NOT NULL,
   email      varchar(100) NOT NULL,
   password   varchar(255) NOT NULL,          -- hash bcrypt, bukan teks polos
-  role       enum('admin','user') NOT NULL DEFAULT 'user',
+  role       enum('admin','user','barcode') NOT NULL DEFAULT 'user',
   created_at timestamp    NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY username (username),

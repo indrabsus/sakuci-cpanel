@@ -23,6 +23,44 @@ function is_admin(?array $user): bool
     return ($user['role'] ?? '') === 'admin';
 }
 
+/** Pengguna role barcode atau username barcode: domain *.barcode.sakuci.id & bisa koding dari 0 */
+function is_barcode(?array $user): bool
+{
+    if (!$user) {
+        return false;
+    }
+    return ($user['role'] ?? '') === 'barcode' || ($user['username'] ?? '') === 'barcode';
+}
+
+/** Mengembalikan akhiran domain berdasarkan pengguna/role ('barcode.sakuci.id' vs SITE_DOMAIN) */
+function get_domain_suffix($userOrRole = null): string
+{
+    $isBarcode = false;
+    if (is_array($userOrRole)) {
+        $isBarcode = is_barcode($userOrRole);
+    } elseif (is_string($userOrRole)) {
+        $isBarcode = ($userOrRole === 'barcode');
+    }
+
+    if ($isBarcode) {
+        return 'barcode.sakuci.id';
+    }
+
+    return defined('SITE_DOMAIN') && SITE_DOMAIN !== '' ? SITE_DOMAIN : 'ukk.sakuci.id';
+}
+
+/** Menghasilkan URL lengkap web project berdasarkan owner/domain */
+function get_project_web_url(array $project, $ownerOrRole = null): string
+{
+    $domainPart = !empty($project['local_path']) ? basename($project['local_path']) : ($project['domain'] ?? '');
+    if (empty($domainPart)) {
+        return '';
+    }
+    $roleOrName = $ownerOrRole ?? ($project['owner_role'] ?? ($project['owner'] ?? ''));
+    $suffix = get_domain_suffix($roleOrName);
+    return 'https://' . $domainPart . '.' . $suffix;
+}
+
 /** Menghentikan halaman yang hanya boleh dibuka admin. */
 function require_admin($conn): array
 {

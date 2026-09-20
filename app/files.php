@@ -24,8 +24,14 @@ if (!is_dir($root)) {
 
 $hasToken = !empty($project['github_token']);
 $isAdmin = is_admin($user);
-$initialPath = trim($_GET['path'] ?? '');
-$webUrl = SITE_DOMAIN !== '' ? 'https://' . basename($root) . '.' . SITE_DOMAIN : '';
+$ownerStmt = $conn->prepare("SELECT role, username FROM users WHERE id = ?");
+$ownerStmt->bind_param("i", $project['user_id']);
+$ownerStmt->execute();
+$ownerData = $ownerStmt->get_result()->fetch_assoc();
+$ownerRole = $ownerData['role'] ?? ($ownerData['username'] ?? '');
+
+$domainSuffix = get_domain_suffix($ownerRole);
+$webUrl = 'https://' . basename($root) . '.' . $domainSuffix;
 
 $stmtDb = $conn->prepare("SELECT id, db_name FROM db_list WHERE project_id = ? LIMIT 1");
 $stmtDb->bind_param("i", $project_id);

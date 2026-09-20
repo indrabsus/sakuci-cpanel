@@ -30,7 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($aksi === 'tambah') {
         $nama = strtolower(trim($_POST['username'] ?? ''));
-        $peran = ($_POST['role'] ?? 'user') === 'admin' ? 'admin' : 'user';
+        $rawRole = $_POST['role'] ?? 'user';
+        $peran = in_array($rawRole, ['admin', 'barcode', 'user'], true) ? $rawRole : 'user';
 
         if (!preg_match('/^[a-z][a-z0-9_]{2,31}$/', $nama)) {
             $pesan = 'err|Username hanya boleh huruf kecil, angka, dan garis bawah (3-32 karakter).';
@@ -39,7 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             try {
                 $hash = password_hash($pw, PASSWORD_DEFAULT);
-                $email = $nama . '@siswa.local';
+                $email = ($peran === 'barcode' || $nama === 'barcode')
+                    ? $nama . '@barcode.sakuci.id'
+                    : $nama . '@siswa.local';
                 $stmt = $conn->prepare(
                     "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)"
                 );
@@ -162,7 +165,8 @@ layout_start('Pengguna', 'Kelola akun siswa dan administrator', 'users', $me);
             <div>
                 <label for="u-peran">Peran</label>
                 <select id="u-peran" name="role">
-                    <option value="user">Siswa</option>
+                    <option value="user">Siswa (Domain *.ukk.sakuci.id &middot; Sakuci Framework)</option>
+                    <option value="barcode">Barcode (Domain *.barcode.sakuci.id &middot; Bebas Koding Dari 0)</option>
                     <option value="admin">Administrator</option>
                 </select>
             </div>
@@ -203,13 +207,19 @@ layout_start('Pengguna', 'Kelola akun siswa dan administrator', 'users', $me);
                         <?php endif; ?>
                     </td>
                     <td>
-                        <span class="pill <?php echo $u['role'] === 'admin' ? 'pill-warn' : 'pill-mute'; ?>">
-                            <?php echo $u['role'] === 'admin' ? 'Admin' : 'Siswa'; ?>
-                        </span>
+                        <?php if ($u['role'] === 'admin'): ?>
+                            <span class="pill pill-warn">Admin</span>
+                        <?php elseif ($u['role'] === 'barcode'): ?>
+                            <span class="pill pill-accent" style="background:#e0e7ff; color:#4338ca; font-weight:600">Barcode</span>
+                        <?php else: ?>
+                            <span class="pill pill-mute">Siswa</span>
+                        <?php endif; ?>
                     </td>
                     <td class="num">
                         <?php if ($u['role'] === 'admin'): ?>
                             <span class="dim">&mdash;</span>
+                        <?php elseif ($u['role'] === 'barcode'): ?>
+                            <span class="pill pill-mute"><?php echo (int) $u['n_project']; ?></span>
                         <?php else: ?>
                             <span class="pill <?php echo (int)$u['n_project'] >= 1 ? 'pill-warn' : 'pill-mute'; ?>" style="<?php echo (int)$u['n_project'] >= 1 ? 'background:#fef3c7; color:#92400e; font-weight:600' : ''; ?>">
                                 <?php echo (int) $u['n_project']; ?> / 1
@@ -219,6 +229,8 @@ layout_start('Pengguna', 'Kelola akun siswa dan administrator', 'users', $me);
                     <td class="num">
                         <?php if ($u['role'] === 'admin'): ?>
                             <span class="dim">&mdash;</span>
+                        <?php elseif ($u['role'] === 'barcode'): ?>
+                            <span class="pill pill-mute"><?php echo (int) $u['n_db']; ?></span>
                         <?php else: ?>
                             <span class="pill <?php echo (int)$u['n_db'] >= 1 ? 'pill-warn' : 'pill-mute'; ?>" style="<?php echo (int)$u['n_db'] >= 1 ? 'background:#fef3c7; color:#92400e; font-weight:600' : ''; ?>">
                                 <?php echo (int) $u['n_db']; ?> / 1

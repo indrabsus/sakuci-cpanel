@@ -11,6 +11,6 @@
 # sehingga vhost wildcard tidak ikut terblokir. Menolak secara terbalik
 # (deny kecuali cocok) lebih aman daripada menyebut nama domain panel:
 # host apa pun yang tak dikenal ikut tertolak.
-<If "! (%{HTTP_HOST} -strmatch '*.ukk.sakuci.id')">
+<If "! (%{HTTP_HOST} -strmatch '*.ukk.sakuci.id' || %{HTTP_HOST} -strmatch '*.barcode.sakuci.id' || %{HTTP_HOST} -strmatch 'barcode.sakuci.id')">
     Require all denied
 </If>

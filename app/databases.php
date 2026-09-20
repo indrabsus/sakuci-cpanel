@@ -15,6 +15,8 @@ $success = '';
 
 $admin = mysql_admin_connect($env);
 $isAdmin = is_admin($user);
+$isBarcode = is_barcode($user);
+$maxDb = $isBarcode ? 10 : 1;
 
 // Penghapusan ditangani lebih dulu lalu dialihkan (pola POST-redirect-GET),
 // supaya menekan refresh tidak mengulang perintah DROP.
@@ -198,14 +200,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($isAdmin) {
         $error = 'Administrator hanya bertugas memantau dan tidak diperkenankan membuat database.';
     } else {
-        // Cek kuota database siswa (maksimal 1)
+        // Cek kuota database
         $stmtCekDb = $conn->prepare("SELECT COUNT(*) AS total FROM db_list WHERE user_id = ?");
         $stmtCekDb->bind_param("i", $user_id);
         $stmtCekDb->execute();
         $userDbCount = (int) $stmtCekDb->get_result()->fetch_assoc()['total'];
 
-        if ($userDbCount >= 1) {
-            $error = 'Batas kuota tercapai: Setiap siswa hanya diperbolehkan memiliki maksimal 1 database. Hapus database yang ada jika ingin membuat database baru.';
+        if ($userDbCount >= $maxDb) {
+            $error = $isBarcode
+                ? 'Batas kuota tercapai: Anda sudah memiliki ' . $maxDb . ' database.'
+                : 'Batas kuota tercapai: Setiap siswa hanya diperbolehkan memiliki maksimal 1 database. Hapus database yang ada jika ingin membuat database baru.';
         }
     }
 
@@ -288,6 +292,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'user' => $db_user,
                         'pass' => $db_pass,
                     ]);
+
+                    // Buat file helper db.php di folder project jika belum ada
+                    if (!empty($pr['local_path']) && is_dir($pr['local_path'])) {
+                        $dbHelperFile = $pr['local_path'] . '/db.php';
+                        if (!file_exists($dbHelperFile)) {
+                            $helperCode = "<?php\n"
+                                . "// Helper koneksi database cPanel Sakuci\n"
+                                . "\$dbHost = 'localhost';\n"
+                                . "\$dbPort = 3306;\n"
+                                . "\$dbName = " . var_export($db_name, true) . ";\n"
+                                . "\$dbUser = " . var_export($db_user, true) . ";\n"
+                                . "\$dbPass = " . var_export($db_pass, true) . ";\n\n"
+                                . "try {\n"
+                                . "    \$pdo = new PDO(\"mysql:host=\$dbHost;port=\$dbPort;dbname=\$dbName;charset=utf8mb4\", \$dbUser, \$dbPass, [\n"
+                                . "        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,\n"
+                                . "        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,\n"
+                                . "    ]);\n"
+                                . "} catch (PDOException \$e) {\n"
+                                . "    die('Koneksi database gagal: ' . \$e->getMessage());\n"
+                                . "}\n";
+                            @file_put_contents($dbHelperFile, $helperCode);
+                            @chmod($dbHelperFile, 0666);
+                        }
+                    }
                 }
 
                 // Password ditampilkan sekali ini saja: yang tersimpan di
@@ -424,25 +452,33 @@ document.addEventListener('DOMContentLoaded', function() {
     exit;
 }
 
-layout_start('Database', $isAdmin ? 'Mode Pemantauan &mdash; Memantau seluruh database milik siswa' : 'Database milik Anda (Maksimal 1 database per siswa)', 'db', $user);
+$headerSubtitle = $isAdmin
+    ? 'Mode Pemantauan &mdash; Memantau seluruh database milik pengguna'
+    : ($isBarcode ? 'Database milik akun Barcode (Mendukung pembuatan per project)' : 'Database milik Anda (Maksimal 1 database per siswa)');
+
+layout_start('Database', $headerSubtitle, 'db', $user);
 ?>
 
 <?php if ($error): ?><div class="note note-err"><?php echo $error; ?></div><?php endif; ?>
 <?php if ($success): ?><div class="note note-ok"><?php echo $success; ?></div><?php endif; ?>
 
 <?php if (!$isAdmin): ?>
-    <?php if (count($databases) >= 1): ?>
+    <?php if (count($databases) >= $maxDb): ?>
         <div class="card" style="max-width:640px">
             <div class="card-h">
                 <div>
                     <h2>Kuota Database Anda</h2>
-                    <p><span class="pill pill-warn" style="background:#fef3c7; color:#92400e; font-weight:600">1 / 1 Database Digunakan (Kuota Penuh)</span></p>
+                    <p><span class="pill pill-warn" style="background:#fef3c7; color:#92400e; font-weight:600"><?php echo count($databases); ?> / <?php echo $maxDb; ?> Database Digunakan (Kuota Penuh)</span></p>
                 </div>
             </div>
             <div class="card-b">
                 <p style="color:var(--ink-2); font-size:13.5px; line-height:1.6; margin:0">
-                    Setiap akun siswa dibatasi maksimal <strong>1 database</strong>. Anda saat ini menggunakan database <code><?php echo htmlspecialchars($databases[0]['db_name'] ?? ''); ?></code>.<br>
-                    Jika Anda ingin membuat database dengan nama lain, kosongkan tabel atau hapus database yang ada di bawah ini terlebih dahulu.
+                    <?php if ($isBarcode): ?>
+                        Akun Barcode telah mencapai batas kuota <strong><?php echo $maxDb; ?> database</strong>. Hapus database yang tidak terpakai jika ingin membuat database baru.
+                    <?php else: ?>
+                        Setiap akun siswa dibatasi maksimal <strong>1 database</strong>. Anda saat ini menggunakan database <code><?php echo htmlspecialchars($databases[0]['db_name'] ?? ''); ?></code>.<br>
+                        Jika Anda ingin membuat database dengan nama lain, kosongkan tabel atau hapus database yang ada di bawah ini terlebih dahulu.
+                    <?php endif; ?>
                 </p>
             </div>
         </div>
@@ -451,7 +487,13 @@ layout_start('Database', $isAdmin ? 'Mode Pemantauan &mdash; Memantau seluruh da
             <div class="card-h">
                 <div>
                     <h2>Database Baru</h2>
-                    <p>Kredensial dibuat otomatis dan langsung ditulis ke .env project (Kuota: 0 / 1 Database)</p>
+                    <p>
+                        <?php if ($isBarcode): ?>
+                            Kredensial dibuat otomatis dan ditulis ke .env &amp; helper db.php (Penggunaan: <?php echo count($databases); ?> / <?php echo $maxDb; ?> Database)
+                        <?php else: ?>
+                            Kredensial dibuat otomatis dan langsung ditulis ke .env project (Kuota: <?php echo count($databases); ?> / <?php echo $maxDb; ?> Database)
+                        <?php endif; ?>
+                    </p>
                 </div>
             </div>
             <div class="card-b">
@@ -486,8 +528,8 @@ layout_start('Database', $isAdmin ? 'Mode Pemantauan &mdash; Memantau seluruh da
 <div class="card">
     <div class="card-h">
         <div>
-            <h2><?php echo $isAdmin ? 'Daftar Database Siswa' : 'Database Anda'; ?></h2>
-            <p><?php echo $isAdmin ? count($databases) . ' database milik seluruh siswa terdaftar' : (count($databases) >= 1 ? '1 / 1 database aktif terhubung ke project Anda' : '0 database terdaftar'); ?></p>
+            <h2><?php echo $isAdmin ? 'Daftar Database Pengguna' : 'Database Anda'; ?></h2>
+            <p><?php echo $isAdmin ? count($databases) . ' database milik seluruh pengguna terdaftar' : (count($databases) >= 1 ? count($databases) . ' database aktif terhubung ke project Anda' : '0 database terdaftar'); ?></p>
         </div>
     </div>
 

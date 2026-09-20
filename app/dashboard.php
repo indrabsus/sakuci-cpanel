@@ -6,6 +6,7 @@ include 'partials/layout.php';
 $user = require_login($conn);
 $user_id = $user['id'];
 $admin = is_admin($user);
+$isBarcode = is_barcode($user);
 
 // Pesan dari halaman lain, mis. setelah menambah project.
 $pesanOk = '';
@@ -54,7 +55,7 @@ function get_project_commit(string $localPath, string $gitUrl = ''): ?array
 
 // Admin melihat milik semua orang; siswa hanya miliknya sendiri.
 $projects = [];
-$sql = "SELECT p.*, u.username AS owner, d.id AS db_id, d.db_name FROM projects p
+$sql = "SELECT p.*, u.username AS owner, u.role AS owner_role, d.id AS db_id, d.db_name FROM projects p
         JOIN users u ON u.id = p.user_id
         LEFT JOIN db_list d ON d.project_id = p.id"
      . ($admin ? "" : " WHERE p.user_id = $user_id")
@@ -207,10 +208,12 @@ layout_start(
 <div class="card">
     <div class="card-h">
         <div>
-            <h2><?php echo $admin ? 'Daftar Project Siswa' : 'Project Anda'; ?></h2>
+            <h2><?php echo $admin ? 'Daftar Project' : ($isBarcode ? 'Project Barcode' : 'Project Anda'); ?></h2>
             <p>
                 <?php if ($admin): ?>
-                    Menampilkan seluruh project yang dibuat oleh siswa di panel (Mode Pemantauan Admin)
+                    Menampilkan seluruh project yang dibuat oleh pengguna di panel (Mode Pemantauan Admin)
+                <?php elseif ($isBarcode): ?>
+                    Domain Proyek: <code>*.barcode.sakuci.id</code> &mdash; Bebas koding dari 0 atau Sakuci Framework (Penggunaan: <?php echo count($projects); ?> / 10 Project)
                 <?php else: ?>
                     <?php if (count($projects) >= 1): ?>
                         <span class="pill pill-warn" style="background:#fef3c7; color:#92400e; font-weight:600">1 / 1 Project Digunakan (Kuota Penuh)</span> &mdash; Didukung Vercel-like Git Sync
@@ -260,7 +263,10 @@ layout_start(
     <?php if (!$projects): ?>
         <div class="empty">
             <?php if ($admin): ?>
-                <p>Belum ada siswa yang mendaftarkan project.</p>
+                <p>Belum ada pengguna yang mendaftarkan project.</p>
+            <?php elseif ($isBarcode): ?>
+                <p>Belum ada project. Anda dapat membuat project mulai dari 0 atau menggunakan Sakuci Framework.</p>
+                <a class="btn" href="add-project.php"><?php echo ikon('plus'); ?>Buat Project Baru</a>
             <?php else: ?>
                 <p>Belum ada project. Anda memiliki kuota 1 project dan 1 database.</p>
                 <a class="btn" href="add-project.php"><?php echo ikon('plus'); ?>Tambah Project (0/1)</a>
@@ -276,9 +282,11 @@ layout_start(
                 <?php
                 $cloned = $project['cloned'] ?? is_dir($project['local_path']);
                 $hasToken = !empty($project['github_token']);
-                $url = SITE_DOMAIN !== ''
-                    ? 'https://' . basename($project['local_path']) . '.' . SITE_DOMAIN
-                    : '';
+                $isLocal = str_starts_with($project['git_url'] ?? '', 'local://');
+                $domainSuffix = get_domain_suffix($project['owner_role'] ?? ($project['owner'] ?? ''));
+                $subdomain = basename($project['local_path']);
+                $fullDomain = $subdomain . '.' . $domainSuffix;
+                $url = 'https://' . $fullDomain;
                 $commit = $project['commit'] ?? ($cloned ? get_project_commit($project['local_path'], $project['git_url']) : null);
                 $modalData = [
                     'id'       => (int) $project['id'],
@@ -302,6 +310,9 @@ layout_start(
                                 <?php if ($admin): ?>
                                     <span class="pill pill-mute"><?php echo htmlspecialchars($project['owner']); ?></span>
                                 <?php endif; ?>
+                                <?php if ($isLocal): ?>
+                                    <span class="pill pill-accent" style="background:#e0e7ff; color:#4338ca; border:1px solid #c7d2fe">🚀 Proyek Dari 0</span>
+                                <?php endif; ?>
                                 <span class="pill <?php echo $cloned ? 'pill-accent' : 'pill-warn'; ?>">
                                     <?php echo $cloned ? 'Aktif' : 'Belum di-clone'; ?>
                                 </span>
@@ -310,13 +321,15 @@ layout_start(
                                         📍 #<?php echo htmlspecialchars($commit['short']); ?>
                                     </span>
                                 <?php endif; ?>
-                                <?php if ($hasToken): ?>
+                                <?php if (!$isLocal && $hasToken): ?>
                                     <span class="pill pill-accent" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd" title="Fitur push & akses repo privat aktif">🔑 Push Aktif</span>
-                                <?php else: ?>
+                                <?php elseif (!$isLocal): ?>
                                     <span class="pill pill-mute" title="Token belum diatur (Read-Only)">⚪ Push Nonaktif</span>
                                 <?php endif; ?>
                             </div>
-                            <div class="proyek-m mono"><?php echo htmlspecialchars($project['git_url']); ?></div>
+                            <div class="proyek-m mono">
+                                <?php echo $isLocal ? '📁 Project Lokal &middot; Bebas Ngoding Langsung di Editor' : htmlspecialchars($project['git_url']); ?>
+                            </div>
                         </div>
 
                     </div>
@@ -325,10 +338,10 @@ layout_start(
                         <div><dt>Alamat Web</dt><dd>
                             <?php if ($cloned && $url !== ''): ?>
                                 <a href="<?php echo htmlspecialchars($url); ?>" target="_blank" rel="noopener noreferrer">
-                                    <?php echo htmlspecialchars(basename($project['local_path']) . '.' . SITE_DOMAIN); ?>
+                                    <?php echo htmlspecialchars($fullDomain); ?>
                                 </a>
                             <?php else: ?>
-                                <span class="dim"><?php echo htmlspecialchars($project['domain'] ?? '—'); ?></span>
+                                <span class="dim"><?php echo htmlspecialchars($fullDomain); ?></span>
                             <?php endif; ?>
                         </dd></div>
                         <div><dt>Branch</dt><dd class="mono"><span class="pill pill-mute" style="font-family:monospace; font-size:.78rem">🌿 <?php echo htmlspecialchars($project['git_branch'] ?: 'main'); ?></span></dd></div>
@@ -354,7 +367,7 @@ layout_start(
                                         </span>
                                     </div>
                                 <?php else: ?>
-                                    <span class="dim"><?php echo $cloned ? 'Belum ada commit' : '—'; ?></span>
+                                    <span class="dim"><?php echo $cloned ? ($isLocal ? 'Inisialisasi lokal siap' : 'Belum ada commit') : '—'; ?></span>
                                 <?php endif; ?>
                             </dd>
                         </div>
@@ -362,7 +375,11 @@ layout_start(
                     </dl>
 
                     <div class="git-actions">
-                        <?php if ($cloned): ?>
+                        <?php if ($isLocal): ?>
+                            <span class="git-status" style="font-size:.82rem; color:var(--ink-2); display:inline-flex; align-items:center; gap:.35rem">
+                                <span>💻</span> Berkas lokal &mdash; Klik <strong>Editor</strong> untuk mulai ngoding
+                            </span>
+                        <?php elseif ($cloned): ?>
                             <button class="git-btn" data-action="pull" title="Tarik pembaruan kode dari GitHub">Pull</button>
                             <?php if ($hasToken): ?>
                                 <button class="git-btn git-btn-push" data-action="push" title="Commit & Push perubahan lokal di server ke GitHub">🚀 Push ke GitHub</button>
@@ -379,10 +396,12 @@ layout_start(
 
                         <span class="git-spacer"></span>
 
-                        <button type="button" class="git-btn git-btn-webhook"
-                                onclick="openGitSettings(<?php echo htmlspecialchars(json_encode($modalData), ENT_QUOTES); ?>)">
-                            ⚡ Webhook &amp; Git
-                        </button>
+                        <?php if (!$isLocal): ?>
+                            <button type="button" class="git-btn git-btn-webhook"
+                                    onclick="openGitSettings(<?php echo htmlspecialchars(json_encode($modalData), ENT_QUOTES); ?>)">
+                                ⚡ Webhook &amp; Git
+                            </button>
+                        <?php endif; ?>
 
                         <a class="git-btn git-btn-db" href="<?php echo !empty($project['db_id']) ? 'databases.php?open_designer=' . $project['db_id'] : 'databases.php'; ?>" title="Buka Database &amp; Table Designer">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
