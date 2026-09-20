@@ -32,6 +32,20 @@ if (!$root || !is_dir($root)) {
 }
 
 $hasToken = !empty($project['github_token']);
+$isLocal = str_starts_with($project['git_url'] ?? '', 'local://');
+$isBarcodeUser = is_barcode($me);
+$isBarcodeProject = false;
+if (!empty($project['user_id'])) {
+    $ownerStmt = $conn->prepare("SELECT role, username FROM users WHERE id = ?");
+    $ownerStmt->bind_param("i", $project['user_id']);
+    $ownerStmt->execute();
+    $ownerData = $ownerStmt->get_result()->fetch_assoc();
+    $isBarcodeProject = is_barcode($ownerData);
+}
+
+// User barcode, pemilik project barcode, project lokal (dari 0), admin, atau repo ber-PAT boleh edit
+$canEditProject = $isAdmin || $isBarcodeUser || $isBarcodeProject || $isLocal || $hasToken;
+
 $action = $_REQUEST['action'] ?? 'tree';
 
 /** Membaca pohon direktori secara rekursif (mengabaikan .git) */
@@ -92,7 +106,8 @@ if ($action === 'tree') {
             'id' => (int) $project['id'],
             'name' => $project['name'],
             'branch' => $project['git_branch'] ?: 'main',
-            'hasToken' => $hasToken,
+            'hasToken' => $canEditProject,
+            'isLocal' => $isLocal,
         ],
         'tree' => $tree,
     ]);
@@ -118,7 +133,7 @@ if ($action === 'read') {
     }
 
     $isEnv = is_env_file(basename($target));
-    $canEdit = $isAdmin || $hasToken || $isEnv;
+    $canEdit = $canEditProject || $isEnv;
     $content = (string) file_get_contents($target);
 
     echo json_encode([
@@ -152,7 +167,7 @@ if ($action === 'save') {
     }
 
     $isEnv = is_env_file(basename($target));
-    $canEdit = $isAdmin || $hasToken || $isEnv;
+    $canEdit = $canEditProject || $isEnv;
 
     if (!$canEdit) {
         http_response_code(403);
@@ -189,6 +204,12 @@ if ($action === 'create_file') {
         exit;
     }
 
+    if (!$canEditProject) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Aksi tidak diizinkan pada project Read-Only. Hubungkan GitHub PAT lebih dulu.']);
+        exit;
+    }
+
     $parentPath = trim((string) ($_POST['parent_path'] ?? ''));
     $fileName = trim((string) ($_POST['name'] ?? ''));
 
@@ -217,6 +238,7 @@ if ($action === 'create_file') {
         echo json_encode(['error' => 'Gagal membuat berkas di server.']);
         exit;
     }
+    @chmod($newFile, 0666);
 
     $rel = ltrim(substr($newFile, strlen($root)), '/\\');
     echo json_encode(['status' => 'ok', 'path' => str_replace('\\', '/', $rel)]);
@@ -227,6 +249,12 @@ if ($action === 'create_file') {
 if ($action === 'create_folder') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         http_response_code(405);
+        exit;
+    }
+
+    if (!$canEditProject) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Aksi tidak diizinkan pada project Read-Only. Hubungkan GitHub PAT lebih dulu.']);
         exit;
     }
 
@@ -268,6 +296,12 @@ if ($action === 'create_folder') {
 if ($action === 'rename') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         http_response_code(405);
+        exit;
+    }
+
+    if (!$canEditProject) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Aksi tidak diizinkan pada project Read-Only. Hubungkan GitHub PAT lebih dulu.']);
         exit;
     }
 
@@ -315,6 +349,12 @@ if ($action === 'rename') {
 if ($action === 'delete') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         http_response_code(405);
+        exit;
+    }
+
+    if (!$canEditProject) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Aksi tidak diizinkan pada project Read-Only. Hubungkan GitHub PAT lebih dulu.']);
         exit;
     }
 

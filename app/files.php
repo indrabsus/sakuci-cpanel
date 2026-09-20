@@ -30,6 +30,11 @@ $ownerStmt->execute();
 $ownerData = $ownerStmt->get_result()->fetch_assoc();
 $ownerRole = $ownerData['role'] ?? ($ownerData['username'] ?? '');
 
+$isLocal = str_starts_with($project['git_url'] ?? '', 'local://');
+$isBarcodeUser = is_barcode($user);
+$isBarcodeOwner = is_barcode($ownerData);
+$canEditProject = $isAdmin || $isBarcodeUser || $isBarcodeOwner || $isLocal || $hasToken;
+
 $domainSuffix = get_domain_suffix($ownerRole);
 $webUrl = 'https://' . basename($root) . '.' . $domainSuffix;
 
@@ -92,7 +97,7 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
             <button type="button" class="vsc-btn vsc-btn-save" id="vsc-btn-top-save" onclick="window.VSC_IDE.saveActiveFile()" title="Simpan berkas aktif (Ctrl+S)">
                 💾 <span class="vsc-save-label">Simpan</span>
             </button>
-            <?php if ($hasToken): ?>
+            <?php if ($hasToken && !$isLocal): ?>
                 <button type="button" class="vsc-btn vsc-btn-push" onclick="openPushModal()" title="Commit &amp; Push ke GitHub">
                     🚀 <span class="hide-mobile">Push</span>
                 </button>
@@ -124,7 +129,7 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
             <button type="button" class="vsc-act-btn" id="act-btn-cli" title="Sakuci CLI Helper (Controller, Model, Migrate)" onclick="openCliModal()">
                 ⚡
             </button>
-            <?php if ($hasToken): ?>
+            <?php if ($hasToken && !$isLocal): ?>
                 <button type="button" class="vsc-act-btn" title="Commit &amp; Push ke GitHub" onclick="openPushModal()">
                     🚀
                 </button>
@@ -181,6 +186,7 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
             </div>
 
             <!-- Read-Only Banner -->
+            <?php if (!$canEditProject): ?>
             <div id="vsc-readonly-banner" class="vsc-readonly-banner">
                 <div>
                     🔒 <strong>Mode Baca Saja (Read-Only)</strong> &mdash; Berkas ini dilacak oleh repositori Git. Hubungkan <strong>GitHub Personal Access Token (PAT)</strong> Anda di Dashboard untuk mengaktifkan pengeditan langsung dan sinkronisasi <strong>Commit &amp; Push</strong> dua arah. (Berkas konfigurasi <code>.env</code> tetap dapat disunting langsung).
@@ -189,6 +195,7 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
                     Hubungkan PAT &rarr;
                 </a>
             </div>
+            <?php endif; ?>
 
             <!-- Monaco Editor Container -->
             <div id="vsc-monaco-wrap" class="vsc-monaco-wrap" style="display:none">
@@ -247,7 +254,7 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
                     <div style="display:flex; gap:6px">
                         <button type="button" class="vsc-btn btn-sm" onclick="window.VSC_IDE.fetchGitStatus()">🔄 Refresh</button>
                         <button type="button" class="vsc-btn btn-sm" style="background:#7f1d1d; border-color:#991b1b" onclick="window.VSC_IDE.discardAllChanges()">↩️ Batalkan Semua</button>
-                        <?php if ($hasToken): ?>
+                        <?php if ($hasToken && !$isLocal): ?>
                             <button type="button" class="vsc-btn vsc-btn-push btn-sm" onclick="openPushModal()">🚀 Commit &amp; Push</button>
                         <?php endif; ?>
                     </div>
@@ -295,12 +302,14 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
             <span class="vsc-status-item" style="cursor:pointer" onclick="window.VSC_IDE.switchView('git')">
                 ⎇ <span id="vsc-status-branch"><?php echo htmlspecialchars($project['git_branch'] ?: 'main'); ?></span>
             </span>
-            <?php if ($hasToken): ?>
+            <?php if ($hasToken && !$isLocal): ?>
                 <button type="button" class="vsc-status-btn" onclick="openPushModal()" title="Kirim perubahan lokal ke GitHub">
                     ☁️ Push
                 </button>
-            <?php else: ?>
+            <?php elseif (!$isLocal): ?>
                 <span class="vsc-status-item" style="opacity:0.7" title="GitHub PAT belum terhubung">⚪ Push Nonaktif</span>
+            <?php else: ?>
+                <span class="vsc-status-item" style="opacity:0.7" title="Proyek Lokal (Bebas Ngoding Langsung)">📁 Proyek Lokal</span>
             <?php endif; ?>
             <button type="button" class="vsc-status-btn vsc-status-save-btn" onclick="window.VSC_IDE.saveActiveFile()" title="Klik untuk simpan berkas aktif (Ctrl+S)">
                 <span id="vsc-status-save">Siap</span>
@@ -506,7 +515,9 @@ window.VSC_PROJECT = {
     name: <?php echo json_encode($project['name']); ?>,
     domain: <?php echo json_encode($project['domain']); ?>,
     branch: <?php echo json_encode($project['git_branch'] ?: 'main'); ?>,
-    hasToken: <?php echo $hasToken ? 'true' : 'false'; ?>,
+    hasToken: <?php echo ($hasToken || $canEditProject) ? 'true' : 'false'; ?>,
+    isLocal: <?php echo $isLocal ? 'true' : 'false'; ?>,
+    canEditProject: <?php echo $canEditProject ? 'true' : 'false'; ?>,
     initialPath: <?php echo json_encode($initialPath); ?>
 };
 
