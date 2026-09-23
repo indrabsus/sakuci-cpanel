@@ -1,4 +1,6 @@
 <?php
+date_default_timezone_set('Asia/Jakarta');
+
 // Kredensial dibaca dari config/env.php yang TIDAK masuk git, supaya file yang
 // sama bisa dipakai di laptop maupun server tanpa mengedit kode.
 // Salin env.example.php menjadi env.php lalu sesuaikan isinya.
@@ -33,6 +35,7 @@ ini_set('log_errors', '1');
 try {
     $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
     $conn->set_charset("utf8mb4");
+    $conn->query("SET time_zone = '+07:00'");
 } catch (mysqli_sql_exception $e) {
     error_log('DB connect failed: ' . $e->getMessage());
     http_response_code(500);
