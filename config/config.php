@@ -30,6 +30,11 @@ enforce_ip_allowlist($env['allowed_ips'] ?? []);
 ini_set('display_errors', !empty($env['debug']) ? '1' : '0');
 ini_set('log_errors', '1');
 
+// Kompresi output Gzip otomatis untuk mempercepat transfer respon HTML/JSON
+if (!ini_get('zlib.output_compression') && extension_loaded('zlib')) {
+    ini_set('zlib.output_compression', '1');
+}
+
 // mysqli melempar exception sejak PHP 8.1, jadi cek $conn->connect_error
 // tidak pernah tercapai -- koneksi gagal harus ditangkap dengan try/catch.
 try {

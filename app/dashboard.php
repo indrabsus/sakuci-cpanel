@@ -20,8 +20,46 @@ if (isset($_GET['pesan']) && str_contains((string) $_GET['pesan'], '|')) {
     }
 }
 
-// Mengambil informasi commit terakhir dari repositori lokal beserta timestamp
-function get_project_commit(string $localPath, string $gitUrl = ''): ?array
+/**
+ * Format selisih waktu commit relatif dalam bahasa Indonesia yang ramah.
+ */
+function format_waktu_git(int $timestamp): string
+{
+    if ($timestamp <= 0) {
+        return '';
+    }
+    $diff = time() - $timestamp;
+    if ($diff < 0 || $diff < 60) {
+        return 'baru saja';
+    }
+    if ($diff < 3600) {
+        $m = max(1, (int) floor($diff / 60));
+        return $m . ' mnt lalu';
+    }
+    if ($diff < 86400) {
+        $h = (int) floor($diff / 3600);
+        return $h . ' jam lalu';
+    }
+    if ($diff < 604800) {
+        $d = (int) floor($diff / 86400);
+        return $d . ' hari lalu';
+    }
+    if ($diff < 2592000) {
+        $w = (int) floor($diff / 604800);
+        return $w . ' minggu lalu';
+    }
+    if ($diff < 31536000) {
+        $mo = (int) floor($diff / 2592000);
+        return $mo . ' bln lalu';
+    }
+    $y = (int) floor($diff / 31536000);
+    return $y . ' thn lalu';
+}
+
+/**
+ * Mengambil informasi commit git secara langsung via subshell git log.
+ */
+function get_project_commit_fresh(string $localPath, string $gitUrl = ''): ?array
 {
     if (!is_dir($localPath . '/.git')) {
         return null;
@@ -42,15 +80,66 @@ function get_project_commit(string $localPath, string $gitUrl = ''): ?array
     if (!empty($gitUrl) && preg_match('#github\.com[:/]([^/]+)/([^/\.]+)(\.git)?#i', $gitUrl, $m)) {
         $url = 'https://github.com/' . $m[1] . '/' . $m[2] . '/commit/' . ($parts[4] ?? $parts[0]);
     }
+    $timestamp = isset($parts[5]) ? (int) $parts[5] : 0;
     return [
         'short'     => $parts[0],
         'subject'   => $parts[1],
         'author'    => $parts[2],
-        'relative'  => $parts[3],
+        'relative'  => $timestamp > 0 ? format_waktu_git($timestamp) : $parts[3],
         'hash'      => $parts[4] ?? $parts[0],
-        'timestamp' => isset($parts[5]) ? (int) $parts[5] : 0,
+        'timestamp' => $timestamp,
         'url'       => $url,
     ];
+}
+
+/**
+ * Smart cache commit git:
+ * Memeriksa mtime berkas .git/logs/HEAD atau .git/HEAD (~0.005 ms).
+ * Jika mtime belum berubah, gunakan cache dari database tanpa memanggil shell_exec.
+ * Jika berkas berubah atau cache kosong, jalankan git log dan perbarui cache.
+ */
+function get_project_commit(mysqli $conn, array &$project): ?array
+{
+    $localPath = $project['local_path'] ?? '';
+    if (empty($localPath) || !is_dir($localPath . '/.git')) {
+        return null;
+    }
+
+    $gitUrl = $project['git_url'] ?? '';
+    $logsHead = $localPath . '/.git/logs/HEAD';
+    $headFile = $localPath . '/.git/HEAD';
+
+    $mtime = 0;
+    if (file_exists($logsHead)) {
+        $mtime = (int) @filemtime($logsHead);
+    } elseif (file_exists($headFile)) {
+        $mtime = (int) @filemtime($headFile);
+    }
+
+    // 1. Cek cache database
+    $cachedMtime = isset($project['commit_mtime']) ? (int) $project['commit_mtime'] : -1;
+    if (!empty($project['commit_cache']) && $cachedMtime === $mtime && $mtime > 0) {
+        $cached = json_decode($project['commit_cache'], true);
+        if (is_array($cached) && !empty($cached['short'])) {
+            if (!empty($cached['timestamp'])) {
+                $cached['relative'] = format_waktu_git((int) $cached['timestamp']);
+            }
+            return $cached;
+        }
+    }
+
+    // 2. Cache miss atau repositori berubah: panggil git log fresh
+    $fresh = get_project_commit_fresh($localPath, $gitUrl);
+    if ($fresh) {
+        $project['commit_cache'] = json_encode($fresh);
+        $project['commit_mtime'] = $mtime;
+
+        $pId = (int) $project['id'];
+        $safeCache = $conn->real_escape_string(json_encode($fresh));
+        @$conn->query("UPDATE projects SET commit_cache = '$safeCache', commit_mtime = $mtime WHERE id = $pId");
+    }
+
+    return $fresh;
 }
 
 // Admin melihat milik semua orang; siswa hanya miliknya sendiri.
@@ -76,10 +165,10 @@ if ($result) {
 // Simpan total seluruh project sebelum difilter
 $total_projects_count = count($projects);
 
-// Hitung metadata commit & aktivitas git untuk setiap project
+// Hitung metadata commit & aktivitas git untuk setiap project (menggunakan Smart Cache)
 foreach ($projects as &$p) {
     $cloned = is_dir($p['local_path']);
-    $commit = $cloned ? get_project_commit($p['local_path'], $p['git_url']) : null;
+    $commit = $cloned ? get_project_commit($conn, $p) : null;
     $p['cloned'] = $cloned;
     $p['commit'] = $commit;
     $lpTime = !empty($p['last_pull']) ? strtotime($p['last_pull']) : 0;
@@ -356,7 +445,7 @@ layout_start(
                 $subdomain = basename($project['local_path']);
                 $fullDomain = $subdomain . '.' . $domainSuffix;
                 $url = 'https://' . $fullDomain;
-                $commit = $project['commit'] ?? ($cloned ? get_project_commit($project['local_path'], $project['git_url']) : null);
+                $commit = $project['commit'] ?? null;
                 $modalData = [
                     'id'       => (int) $project['id'],
                     'name'     => $project['name'],

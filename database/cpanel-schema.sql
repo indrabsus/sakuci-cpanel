@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS projects (
   status      enum('active','inactive') DEFAULT 'active',
   created_at  timestamp    NULL DEFAULT CURRENT_TIMESTAMP,
   last_pull   timestamp    NULL DEFAULT NULL,
+  commit_cache text        DEFAULT NULL,
+  commit_mtime bigint       DEFAULT 0,
   PRIMARY KEY (id),
   -- Unik agar dua project tidak menunjuk folder dan subdomain yang sama.
   UNIQUE KEY unik_local_path (local_path),
