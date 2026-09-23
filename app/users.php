@@ -118,16 +118,39 @@ if (isset($_GET['pesan']) && str_contains((string) $_GET['pesan'], '|')) {
     }
 }
 
-// Daftar akun beserta jumlah project dan databasenya
+// Daftar akun beserta jumlah project, database, dan status online
 $users = [];
 $q = $conn->query(
-    "SELECT u.id, u.username, u.role, u.created_at,
+    "SELECT u.id, u.username, u.role, u.last_activity, u.created_at,
             (SELECT COUNT(*) FROM projects p WHERE p.user_id = u.id) AS n_project,
             (SELECT COUNT(*) FROM db_list d WHERE d.user_id = u.id) AS n_db
        FROM users u ORDER BY u.role DESC, u.username"
 );
 while ($row = $q->fetch_assoc()) {
+    $row['is_online'] = is_user_online($row['last_activity']);
     $users[] = $row;
+}
+
+$total_all = count($users);
+$total_online = 0;
+foreach ($users as $u) {
+    if ($u['is_online']) {
+        $total_online++;
+    }
+}
+$total_offline = $total_all - $total_online;
+
+// Filter tab: semua, online, offline
+$filter = trim((string) ($_GET['filter'] ?? 'semua'));
+if (!in_array($filter, ['semua', 'online', 'offline'], true)) {
+    $filter = 'semua';
+}
+
+$filtered_users = $users;
+if ($filter === 'online') {
+    $filtered_users = array_values(array_filter($users, fn($u) => $u['is_online']));
+} elseif ($filter === 'offline') {
+    $filtered_users = array_values(array_filter($users, fn($u) => !$u['is_online']));
 }
 
 layout_start('Pengguna', 'Kelola akun siswa dan administrator', 'users', $me);
@@ -183,22 +206,42 @@ layout_start('Pengguna', 'Kelola akun siswa dan administrator', 'users', $me);
 
 <div class="card">
     <div class="card-h">
-        <div>
-            <h2>Daftar Akun</h2>
-            <p><?php echo count($users); ?> akun terdaftar</p>
+        <div style="display:flex; align-items:center; justify-content:space-between; width:100%; flex-wrap:wrap; gap:.5rem;">
+            <div>
+                <h2>Daftar Akun</h2>
+                <p><?php echo count($filtered_users); ?> dari <?php echo $total_all; ?> akun terdaftar</p>
+            </div>
+            <div style="display:flex; gap:.35rem; align-items:center;">
+                <a href="users.php" class="btn btn-sm <?php echo $filter === 'semua' ? '' : 'btn-2'; ?>">Semua (<?php echo $total_all; ?>)</a>
+                <a href="users.php?filter=online" class="btn btn-sm <?php echo $filter === 'online' ? '' : 'btn-2'; ?>" style="<?php echo $filter === 'online' ? 'background:#059669; border-color:#059669;' : ''; ?>">
+                    <span class="dot-online pulse-online" style="margin-right:4px;"></span> Online (<?php echo $total_online; ?>)
+                </a>
+                <a href="users.php?filter=offline" class="btn btn-sm <?php echo $filter === 'offline' ? '' : 'btn-2'; ?>">Offline (<?php echo $total_offline; ?>)</a>
+            </div>
         </div>
     </div>
     <div class="card-b flush">
         <table>
             <thead>
                 <tr>
-                    <th>Pengguna</th><th>Peran</th>
-                    <th class="num">Project</th><th class="num">Database</th>
-                    <th class="num">Dibuat</th><th></th>
+                    <th>Pengguna</th>
+                    <th>Peran</th>
+                    <th>Status</th>
+                    <th class="num">Project</th>
+                    <th class="num">Database</th>
+                    <th class="num">Dibuat</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
-            <?php foreach ($users as $u): ?>
+            <?php if (empty($filtered_users)): ?>
+                <tr>
+                    <td colspan="7" class="empty" style="padding:2rem; text-align:center;">
+                        <span class="dim">Tidak ada akun pada filter "<?php echo htmlspecialchars($filter); ?>".</span>
+                    </td>
+                </tr>
+            <?php else: ?>
+            <?php foreach ($filtered_users as $u): ?>
                 <tr>
                     <td>
                         <strong><?php echo htmlspecialchars($u['username']); ?></strong>
@@ -213,6 +256,19 @@ layout_start('Pengguna', 'Kelola akun siswa dan administrator', 'users', $me);
                             <span class="pill pill-accent" style="background:#e0e7ff; color:#4338ca; font-weight:600">Barcode</span>
                         <?php else: ?>
                             <span class="pill pill-mute">Siswa</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if ($u['is_online']): ?>
+                            <span class="pill pill-ok" style="display:inline-flex; align-items:center; gap:5px;" title="Aktif dalam 5 menit terakhir">
+                                <span class="dot-online pulse-online" style="width:6px; height:6px;"></span> Online
+                            </span>
+                            <span class="dim" style="font-size:.73rem; margin-left:4px;"><?php echo format_waktu_aktif($u['last_activity']); ?></span>
+                        <?php else: ?>
+                            <span class="pill pill-mute" style="display:inline-flex; align-items:center; gap:5px;">
+                                <span class="dot-offline" style="width:6px; height:6px;"></span> Offline
+                            </span>
+                            <span class="dim" style="font-size:.73rem; margin-left:4px;"><?php echo format_waktu_aktif($u['last_activity']); ?></span>
                         <?php endif; ?>
                     </td>
                     <td class="num">
@@ -262,6 +318,7 @@ Database MySQL-nya TIDAK ikut terhapus.');">
                     </td>
                 </tr>
             <?php endforeach; ?>
+            <?php endif; ?>
             </tbody>
         </table>
     </div>

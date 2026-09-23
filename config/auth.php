@@ -9,7 +9,7 @@ function current_user($conn)
         return null;
     }
 
-    $stmt = $conn->prepare("SELECT id, username, role FROM users WHERE id = ?");
+    $stmt = $conn->prepare("SELECT id, username, role, last_activity FROM users WHERE id = ?");
     $stmt->bind_param("i", $_SESSION['user_id']);
     $stmt->execute();
     $user = $stmt->get_result()->fetch_assoc();
@@ -91,6 +91,7 @@ function require_login($conn)
     $user = current_user($conn);
     if ($user) {
         $_SESSION['username'] = $user['username'];
+        catat_aktivitas_user($conn, (int)$user['id']);
         return $user;
     }
 
@@ -104,6 +105,7 @@ function require_api_login($conn)
 {
     $user = current_user($conn);
     if ($user) {
+        catat_aktivitas_user($conn, (int)$user['id']);
         return $user;
     }
 
@@ -111,4 +113,54 @@ function require_api_login($conn)
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);
     exit;
+}
+
+/** Mencatat aktivitas terakhir pengguna untuk status online (dithrottle tiap 30 detik) */
+function catat_aktivitas_user($conn, int $userId): void
+{
+    $now = time();
+    if (!isset($_SESSION['last_activity_ping']) || ($now - (int)$_SESSION['last_activity_ping']) >= 30) {
+        $_SESSION['last_activity_ping'] = $now;
+        $stmt = $conn->prepare("UPDATE users SET last_activity = NOW() WHERE id = ?");
+        if ($stmt) {
+            $stmt->bind_param("i", $userId);
+            $stmt->execute();
+        }
+    }
+}
+
+/** Menentukan apakah pengguna sedang online (aktif dalam batas menit tertentu, default 5 menit) */
+function is_user_online(?string $lastActivity, int $thresholdMinutes = 5): bool
+{
+    if (empty($lastActivity)) {
+        return false;
+    }
+    $ts = strtotime($lastActivity);
+    return ($ts !== false && (time() - $ts) <= ($thresholdMinutes * 60));
+}
+
+/** Format waktu ramah untuk tampilan aktivitas terakhir */
+function format_waktu_aktif(?string $lastActivity): string
+{
+    if (empty($lastActivity)) {
+        return 'Belum pernah aktif';
+    }
+    $ts = strtotime($lastActivity);
+    if ($ts === false) {
+        return 'Tidak diketahui';
+    }
+    $diff = time() - $ts;
+    if ($diff < 60) {
+        return 'Baru saja';
+    }
+    if ($diff < 3600) {
+        return floor($diff / 60) . ' mnt lalu';
+    }
+    if ($diff < 86400) {
+        return floor($diff / 3600) . ' jam lalu';
+    }
+    if ($diff < 172800) {
+        return 'Kemarin, ' . date('H:i', $ts);
+    }
+    return date('d M Y, H:i', $ts);
 }

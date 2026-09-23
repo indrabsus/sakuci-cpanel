@@ -4,6 +4,10 @@ include 'config/auth.php';
 include 'config/login-limit.php';
 
 if (isset($_GET['logout'])) {
+    if (!empty($_SESSION['user_id'])) {
+        $uid = (int) $_SESSION['user_id'];
+        $conn->query("UPDATE users SET last_activity = NULL WHERE id = $uid");
+    }
     clear_session();
     header("Location: index.php");
     exit;
@@ -44,6 +48,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $username;
+            $_SESSION['last_activity_ping'] = time();
+
+            $upd = $conn->prepare("UPDATE users SET last_activity = NOW() WHERE id = ?");
+            if ($upd) {
+                $upd->bind_param("i", $user['id']);
+                $upd->execute();
+            }
+
             header("Location: app/dashboard.php");
             exit;
         }

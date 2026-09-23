@@ -55,7 +55,7 @@ function get_project_commit(string $localPath, string $gitUrl = ''): ?array
 
 // Admin melihat milik semua orang; siswa hanya miliknya sendiri.
 $projects = [];
-$sql = "SELECT p.*, u.username AS owner, u.role AS owner_role, d.id AS db_id, d.db_name FROM projects p
+$sql = "SELECT p.*, u.username AS owner, u.role AS owner_role, u.last_activity AS owner_last_activity, d.id AS db_id, d.db_name FROM projects p
         JOIN users u ON u.id = p.user_id
         LEFT JOIN db_list d ON d.project_id = p.id"
      . ($admin ? "" : " WHERE p.user_id = $user_id")
@@ -141,12 +141,26 @@ if ($result) {
 }
 
 $siswa_count = 0;
+$online_users = [];
 if ($admin) {
     $resSiswa = $conn->query("SELECT COUNT(*) as total FROM users WHERE role = 'user'");
     if ($resSiswa) {
         $siswa_count = (int) $resSiswa->fetch_assoc()['total'];
     }
+
+    $resOnline = $conn->query(
+        "SELECT id, username, role, last_activity 
+         FROM users 
+         WHERE last_activity >= NOW() - INTERVAL 5 MINUTE 
+         ORDER BY last_activity DESC"
+    );
+    if ($resOnline) {
+        while ($uOnline = $resOnline->fetch_assoc()) {
+            $online_users[] = $uOnline;
+        }
+    }
 }
+$online_count = count($online_users);
 
 $terclone = 0;
 foreach ($projects as $p) {
@@ -189,6 +203,13 @@ layout_start(
             <div class="stat-n"><?php echo $db_count; ?></div>
             <div class="stat-l">Database Siswa</div>
         </div>
+        <div class="stat" style="border-left: 3px solid #10b981;">
+            <div class="stat-n" style="color: #059669; display: flex; align-items: center; gap: .4rem;">
+                <span class="dot-online pulse-online"></span>
+                <?php echo $online_count; ?>
+            </div>
+            <div class="stat-l">Pengguna Online</div>
+        </div>
     <?php else: ?>
         <div class="stat">
             <div class="stat-n"><?php echo count($projects); ?> / 1</div>
@@ -204,6 +225,54 @@ layout_start(
         </div>
     <?php endif; ?>
 </div>
+
+<?php if ($admin): ?>
+<div class="card" style="margin-bottom: 1.25rem;">
+    <div class="card-h">
+        <div style="display:flex; align-items:center; justify-content:space-between; width:100%; flex-wrap:wrap; gap:.5rem;">
+            <div>
+                <h2>
+                    <span class="dot-online pulse-online" style="margin-right:6px; vertical-align:middle;"></span>
+                    Pengguna Sedang Online
+                    <span class="pill pill-ok" style="margin-left:6px;"><?php echo $online_count; ?> Online</span>
+                </h2>
+                <p>Pengguna yang aktif membuka cPanel dalam 5 menit terakhir</p>
+            </div>
+            <div>
+                <a href="users.php?filter=online" class="btn btn-2 btn-sm">Lihat di Menu Pengguna &rarr;</a>
+            </div>
+        </div>
+    </div>
+    <div class="card-b flush">
+        <?php if ($online_count === 0): ?>
+            <div class="empty" style="padding: 1.5rem 1rem;">
+                <p>Tidak ada pengguna yang sedang online saat ini.</p>
+            </div>
+        <?php else: ?>
+            <div style="display:flex; flex-wrap:wrap; gap:.6rem; padding: 1rem 1.25rem;">
+                <?php foreach ($online_users as $ou): ?>
+                    <div style="display:inline-flex; align-items:center; gap:.5rem; background: var(--surface-2, #f8fafc); border: 1px solid var(--line, #e2e8f0); border-radius: 8px; padding: .4rem .75rem;">
+                        <span class="dot-online pulse-online"></span>
+                        <strong style="font-size: .88rem;"><?php echo htmlspecialchars($ou['username']); ?></strong>
+                        <?php if ((int)$ou['id'] === (int)$user['id']): ?>
+                            <span class="dim" style="font-size: .75rem;">(Anda)</span>
+                        <?php endif; ?>
+                        <?php if ($ou['role'] === 'admin'): ?>
+                            <span class="pill pill-warn" style="font-size:.65rem; padding:.05rem .35rem;">Admin</span>
+                        <?php elseif ($ou['role'] === 'barcode'): ?>
+                            <span class="pill pill-accent" style="font-size:.65rem; padding:.05rem .35rem; background:#e0e7ff; color:#4338ca;">Barcode</span>
+                        <?php else: ?>
+                            <span class="pill pill-mute" style="font-size:.65rem; padding:.05rem .35rem;">Siswa</span>
+                        <?php endif; ?>
+                        <span class="dim" style="font-size: .75rem; border-left: 1px solid var(--line, #cbd5e1); padding-left: .4rem;"><?php echo format_waktu_aktif($ou['last_activity']); ?></span>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+</div>
+<?php endif; ?>
+
 
 <div class="card">
     <div class="card-h">
@@ -308,7 +377,11 @@ layout_start(
                             <div class="proyek-n">
                                 <span><?php echo htmlspecialchars($project['name']); ?></span>
                                 <?php if ($admin): ?>
-                                    <span class="pill pill-mute"><?php echo htmlspecialchars($project['owner']); ?></span>
+                                    <?php $ownerOnline = is_user_online($project['owner_last_activity'] ?? null); ?>
+                                    <span class="pill pill-mute" style="display:inline-flex; align-items:center; gap:5px;" title="<?php echo $ownerOnline ? 'Pengguna sedang Online' : 'Pengguna Offline'; ?>">
+                                        <span class="<?php echo $ownerOnline ? 'dot-online pulse-online' : 'dot-offline'; ?>" style="width:6px; height:6px;"></span>
+                                        <?php echo htmlspecialchars($project['owner']); ?>
+                                    </span>
                                 <?php endif; ?>
                                 <?php if ($isLocal): ?>
                                     <span class="pill pill-accent" style="background:#e0e7ff; color:#4338ca; border:1px solid #c7d2fe">🚀 Proyek Dari 0</span>

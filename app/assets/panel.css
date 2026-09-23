@@ -263,7 +263,34 @@ td a:hover { color: var(--accent); }
 }
 .pill-accent { background: var(--accent-bg); color: var(--accent-2); }
 .pill-warn   { background: var(--warn-bg);   color: var(--warn); }
+.pill-ok     { background: #ecfdf5; color: #065f46; }
 .pill-mute   { background: var(--line-soft); color: var(--ink-2); }
+
+.dot-online {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+    flex-shrink: 0;
+}
+.dot-offline {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ink-3);
+    opacity: 0.45;
+    flex-shrink: 0;
+}
+@keyframes pulse-dot {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.25); opacity: 0.75; }
+}
+.pulse-online {
+    animation: pulse-dot 2.5s infinite ease-in-out;
+}
 
 /* ---------- Keadaan kosong ---------- */
 

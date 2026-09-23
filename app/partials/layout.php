@@ -107,6 +107,17 @@ function layout_end(bool $pakaiSkrip = false): void
 <?php if ($pakaiSkrip): ?>
 <script src="assets/git-actions.js?v=<?php echo @filemtime(__DIR__ . '/../assets/git-actions.js'); ?>"></script>
 <?php endif; ?>
+<script>
+(function() {
+    function ping() {
+        if (document.visibilityState === 'visible') {
+            fetch('api/ping.php', { method: 'POST', credentials: 'same-origin' }).catch(function() {});
+        }
+    }
+    setInterval(ping, 60000);
+    document.addEventListener('visibilitychange', ping);
+})();
+</script>
 </body>
 </html>
 <?php
