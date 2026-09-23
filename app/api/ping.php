@@ -2,8 +2,8 @@
 // Endpoint heartbeat periodik dari browser cPanel.
 // Menjaga status pengguna tetap "Online" selama tab browser masih aktif dibuka.
 
-include '../../config/config.php';
-include '../../config/auth.php';
+include __DIR__ . '/../../config/config.php';
+include __DIR__ . '/../../config/auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
