@@ -96,6 +96,9 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
             <button type="button" class="vsc-btn vsc-btn-cli" id="vsc-btn-cli" onclick="openCliModal()" title="Sakuci CLI Helper (Controller, Model, Migrate)">
                 ⚡ <span class="hide-mobile">CLI</span>
             </button>
+            <button type="button" class="vsc-btn vsc-btn-autosave active" id="vsc-btn-top-autosave" onclick="window.VSC_IDE && window.VSC_IDE.toggleAutoSave()" title="Klik untuk mengaktifkan / menonaktifkan Simpan Otomatis (Auto-save)">
+                <span id="vsc-top-autosave-icon">⚡</span> <span class="hide-mobile" id="vsc-top-autosave-text">Auto-save: ON</span>
+            </button>
             <button type="button" class="vsc-btn vsc-btn-save" id="vsc-btn-top-save" onclick="window.VSC_IDE.saveActiveFile()" title="Simpan berkas aktif (Ctrl+S)">
                 💾 <span class="vsc-save-label">Simpan</span>
             </button>
@@ -181,6 +184,9 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
                     <button type="button" class="vsc-subbar-tool-btn" id="vsc-subbar-bottom-btn" onclick="window.VSC_IDE && window.VSC_IDE.scrollToBottom()" title="Gulir ke Baris Paling Bawah">
                         ⬇️ <span class="vsc-subbar-btn-text">Bawah</span>
                     </button>
+                    <button type="button" class="vsc-subbar-tool-btn vsc-autosave-toggle-btn active" id="vsc-autosave-toggle-btn" onclick="window.VSC_IDE && window.VSC_IDE.toggleAutoSave()" title="Klik untuk mengaktifkan / menonaktifkan Simpan Otomatis (Auto-save)">
+                        <span id="vsc-subbar-autosave-icon">⚡</span> <span class="vsc-subbar-btn-text" id="vsc-subbar-autosave-text">Auto-save: ON</span>
+                    </button>
                     <button type="button" class="vsc-subbar-save-btn" id="vsc-subbar-save-btn" onclick="window.VSC_IDE.saveActiveFile()" title="Simpan berkas (Ctrl+S)">
                         💾 <span class="vsc-subbar-save-text">Simpan</span>
                     </button>
@@ -246,48 +252,64 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
 
         <!-- Git View (Source Control & Commit History) -->
         <div id="vsc-git-view" class="vsc-git-view">
-            <!-- Panel 1: Perubahan Berkas (Changes) -->
-            <div class="vsc-git-panel">
-                <div class="vsc-git-panel-header">
-                    <div style="display:flex; align-items:center; gap:8px">
-                        <span>🌿 Status Git: <code><span id="vsc-git-branch-name"><?php echo htmlspecialchars($project['git_branch'] ?: 'main'); ?></span></code></span>
-                        <span style="font-size:11.5px; font-weight:normal; color:var(--vsc-text-dim)" id="vsc-git-status-summary">Memuat...</span>
-                    </div>
-                    <div style="display:flex; gap:6px">
-                        <button type="button" class="vsc-btn btn-sm" onclick="window.VSC_IDE.fetchGitStatus()">🔄 Refresh</button>
-                        <button type="button" class="vsc-btn btn-sm" style="background:#7f1d1d; border-color:#991b1b" onclick="window.VSC_IDE.discardAllChanges()">↩️ Batalkan Semua</button>
-                        <?php if ($hasToken && !$isLocal): ?>
-                            <button type="button" class="vsc-btn vsc-btn-push btn-sm" onclick="openPushModal()">🚀 Commit &amp; Push</button>
-                        <?php endif; ?>
-                    </div>
+            <!-- Bilah Atas: Header Source Control -->
+            <div class="vsc-sc-header">
+                <div class="vsc-sc-header-left">
+                    <span class="vsc-sc-title">SOURCE CONTROL</span>
+                    <span class="vsc-sc-branch-pill">🌿 <code><span id="vsc-git-branch-name"><?php echo htmlspecialchars($project['git_branch'] ?: 'main'); ?></span></code></span>
+                    <span class="vsc-sc-summary" id="vsc-git-status-summary">Memeriksa…</span>
                 </div>
-                <div class="vsc-git-panel-body">
-                    <div style="font-size:11.5px; font-weight:600; text-transform:uppercase; color:var(--vsc-text-dim); margin-bottom:8px">
-                        Perubahan Berkas Lokal:
-                    </div>
-                    <div id="vsc-git-file-list" class="vsc-git-file-list">
-                        <div style="color:var(--vsc-text-dim); font-size:12px"><span class="vsc-spin"></span> Memeriksa perubahan…</div>
-                    </div>
+                <div class="vsc-sc-header-actions">
+                    <button type="button" class="vsc-btn btn-sm" onclick="window.VSC_IDE.fetchGitStatus()" title="Muat ulang status Git (Refresh)">🔄 Refresh</button>
+                    <button type="button" class="vsc-btn btn-sm vsc-btn-danger" onclick="window.VSC_IDE.discardAllChanges()" title="Batalkan seluruh perubahan di proyek">↩️ Batalkan Semua</button>
                 </div>
             </div>
 
-            <!-- Panel 2: Riwayat Commit & Kembalikan ke Sebelumnya -->
-            <div class="vsc-git-panel">
-                <div class="vsc-git-panel-header">
-                    <div style="display:flex; align-items:center; gap:8px">
-                        <span>📜 Riwayat Commit (Commit History)</span>
-                    </div>
-                    <button type="button" class="vsc-btn btn-sm" onclick="window.VSC_IDE.fetchGitHistory()">🔄 Refresh Riwayat</button>
+            <!-- Kotak Pesan Commit Cepat (Gaya VS Code) -->
+            <?php if ($hasToken || $isLocal || $canEditProject): ?>
+            <div class="vsc-sc-commit-card">
+                <div class="vsc-sc-commit-wrap">
+                    <input type="text" id="vsc-sc-quick-msg" class="vsc-sc-commit-input" 
+                           placeholder="Pesan commit (Tekan Ctrl+Enter untuk Commit & Push)…" 
+                           value="Update kodingan via Sakuci Editor"
+                           onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter')window.VSC_IDE.quickCommitAndPush()">
+                    <button type="button" class="vsc-btn vsc-btn-push" id="vsc-sc-quick-btn" onclick="window.VSC_IDE.quickCommitAndPush()" title="Commit dan Push langsung ke GitHub (Ctrl+Enter)">
+                        🚀 Commit &amp; Push
+                    </button>
                 </div>
-                <div class="vsc-git-panel-body">
-                    <p style="font-size:12px; color:var(--vsc-text-dim); margin:0 0 10px 0; line-height:1.4">
-                        Daftar commit terbaru pada repositori. Anda dapat mengklik tombol <strong>↩️ Kembalikan ke Ini</strong> untuk me-rollback seluruh kode proyek ke commit tersebut.
+            </div>
+            <?php endif; ?>
+
+            <!-- Section 1: Perubahan Berkas (Changes) -->
+            <div class="vsc-sc-section">
+                <div class="vsc-sc-section-bar">
+                    <span class="vsc-sc-section-title">
+                        <span>▼</span> PERUBAHAN BERKAS (CHANGES)
+                    </span>
+                    <span id="vsc-sc-badge-count" class="vsc-sc-badge">0</span>
+                </div>
+                <div id="vsc-git-file-list" class="vsc-sc-file-list">
+                    <div style="color:var(--vsc-text-dim); font-size:12px; padding:12px 10px"><span class="vsc-spin"></span> Memeriksa perubahan…</div>
+                </div>
+            </div>
+
+            <!-- Section 2: Riwayat Commit & Rollback (Accordion Lipat) -->
+            <details class="vsc-sc-accordion" id="vsc-sc-history-details">
+                <summary class="vsc-sc-accordion-summary">
+                    <div style="display:flex; align-items:center; gap:8px">
+                        <span>📜 RIWAYAT COMMIT &amp; ROLLBACK</span>
+                    </div>
+                    <button type="button" class="vsc-btn btn-sm" style="font-size:11px; padding:2px 8px" onclick="event.preventDefault(); event.stopPropagation(); window.VSC_IDE.fetchGitHistory()">🔄 Refresh Riwayat</button>
+                </summary>
+                <div class="vsc-sc-accordion-body">
+                    <p class="vsc-sc-hint">
+                        Daftar commit sebelumnya. Anda dapat me-rollback seluruh kode proyek ke commit tersebut dengan mengklik tombol <strong>↩️ Kembalikan ke Ini</strong>.
                     </p>
                     <div id="vsc-commit-list" class="vsc-commit-list">
                         <div style="color:var(--vsc-text-dim); font-size:12px"><span class="vsc-spin"></span> Memuat riwayat commit…</div>
                     </div>
                 </div>
-            </div>
+            </details>
         </div>
 
         <?php if ($dbId > 0): ?>
@@ -303,6 +325,9 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
         <div class="vsc-status-left">
             <span class="vsc-status-item" style="cursor:pointer" onclick="window.VSC_IDE.switchView('git')">
                 ⎇ <span id="vsc-status-branch"><?php echo htmlspecialchars($project['git_branch'] ?: 'main'); ?></span>
+            </span>
+            <span class="vsc-status-item vsc-status-autosave-item" id="vsc-status-autosave" style="cursor:pointer" onclick="window.VSC_IDE && window.VSC_IDE.toggleAutoSave()" title="Klik untuk mengubah pengaturan Auto-save">
+                ⚡ Auto-save: ON
             </span>
             <?php if ($hasToken && !$isLocal): ?>
                 <button type="button" class="vsc-status-btn" onclick="openPushModal()" title="Kirim perubahan lokal ke GitHub">
@@ -364,6 +389,31 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Diff Viewer (Lihat Perubahan Berkas seperti di VS Code) -->
+<div id="diff-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeDiffModal()">
+    <div class="modal-card vsc-diff-modal-card">
+        <div class="modal-header">
+            <h3 style="margin:0; font-size:1.05rem; font-weight:600; display:flex; align-items:center; gap:.5rem; overflow:hidden">
+                <span>🔍</span> <span style="white-space:nowrap">Diff:</span>
+                <span id="diff-modal-filename" style="color:var(--vsc-accent); font-family:var(--vsc-font-mono); text-overflow:ellipsis; overflow:hidden; white-space:nowrap"></span>
+            </h3>
+            <div style="display:flex; align-items:center; gap:8px">
+                <span id="diff-modal-stats" class="vsc-diff-stats"></span>
+                <button type="button" class="vsc-btn btn-sm" id="diff-modal-open-btn" onclick="window.VSC_IDE.openDiffFileInEditor()">
+                    📄 Buka
+                </button>
+                <button type="button" class="vsc-btn btn-sm vsc-btn-danger" id="diff-modal-discard-btn" onclick="window.VSC_IDE.discardDiffFile()">
+                    ↩️ Batalkan
+                </button>
+                <button type="button" class="modal-close" onclick="closeDiffModal()" title="Tutup">&times;</button>
+            </div>
+        </div>
+        <div class="modal-body vsc-diff-modal-body">
+            <div id="diff-viewer-content" class="vsc-diff-content"></div>
         </div>
     </div>
 </div>
@@ -532,6 +582,11 @@ function openPushModal() {
 
 function closePushModal() {
     document.getElementById('push-modal').style.display = 'none';
+}
+
+function closeDiffModal() {
+    const modal = document.getElementById('diff-modal');
+    if (modal) modal.style.display = 'none';
 }
 
 async function submitPushJob(e) {

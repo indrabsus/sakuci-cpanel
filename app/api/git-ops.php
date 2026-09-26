@@ -42,7 +42,7 @@ $action = $_REQUEST['action'] ?? 'status';
 function run_git(string $repoPath, string $cmd): array
 {
     $gitBin = '/usr/bin/git';
-    $fullCmd = "cd " . escapeshellarg($repoPath) . " && $gitBin -c safe.directory=* $cmd 2>&1";
+    $fullCmd = "cd " . escapeshellarg($repoPath) . " && $gitBin -c safe.directory=* -c core.fileMode=false $cmd 2>&1";
     $output = [];
     $retCode = 0;
     exec($fullCmd, $output, $retCode);
@@ -51,7 +51,7 @@ function run_git(string $repoPath, string $cmd): array
 
 // 1. Status Perubahan Git
 if ($action === 'status') {
-    [$statusOut, $code] = run_git($root, 'status --porcelain -uall');
+    [$statusOut, $code] = run_git($root, 'status --porcelain');
     [$branchOut, $bCode] = run_git($root, 'branch --show-current');
 
     $branch = trim($branchOut) ?: ($project['git_branch'] ?: 'main');
@@ -66,6 +66,11 @@ if ($action === 'status') {
             $statusCode = substr($line, 0, 2);
             $filePath = trim(substr($line, 2));
             $filePath = trim($filePath, '"\'');
+
+            // Abaikan berkas metadata sistem operasi
+            if (basename($filePath) === '.DS_Store' || basename($filePath) === 'Thumbs.db') {
+                continue;
+            }
 
             $type = 'M';
             $label = 'Modified';
@@ -86,6 +91,7 @@ if ($action === 'status') {
             $files[] = [
                 'path' => $filePath,
                 'name' => basename($filePath),
+                'dir'  => dirname($filePath) === '.' ? '' : dirname($filePath),
                 'type' => $type,
                 'label' => $label,
                 'raw' => $statusCode,
@@ -149,8 +155,9 @@ if ($action === 'discard_file') {
     $isUntracked = str_contains($statusOut, '?');
 
     if ($isUntracked) {
+        run_git($root, 'clean -fd -- ' . escapeshellarg($relPath));
         $target = $root . DIRECTORY_SEPARATOR . $relPath;
-        if (file_exists($target)) {
+        if (file_exists($target) && is_file($target)) {
             @unlink($target);
         }
     } else {
@@ -200,6 +207,57 @@ if ($action === 'rollback_commit') {
         'status' => 'ok',
         'message' => "Project berhasil dikembalikan ke commit $hash.",
         'output' => $resetOut,
+    ]);
+    exit;
+}
+
+// 6. Ambil Perbedaan Berkas (Git Diff per File)
+if ($action === 'diff') {
+    $relPath = trim($_REQUEST['path'] ?? '');
+    if ($relPath === '') {
+        http_response_code(400);
+        echo json_encode(['error' => 'Path berkas required']);
+        exit;
+    }
+
+    // Ambil diff dari git
+    [$diffOut, $code] = run_git($root, 'diff HEAD -- ' . escapeshellarg($relPath));
+
+    $isUntracked = false;
+    $content = '';
+    if (trim($diffOut) === '') {
+        [$statusOut, $sCode] = run_git($root, 'status --porcelain ' . escapeshellarg($relPath));
+        if (str_contains($statusOut, '?')) {
+            $isUntracked = true;
+            $target = $root . DIRECTORY_SEPARATOR . $relPath;
+            if (file_exists($target) && is_file($target)) {
+                $content = @file_get_contents($target);
+            }
+        }
+    }
+
+    $additions = 0;
+    $deletions = 0;
+    if (!$isUntracked && !empty($diffOut)) {
+        $lines = explode("\n", $diffOut);
+        foreach ($lines as $l) {
+            if (str_starts_with($l, '+++') || str_starts_with($l, '---')) continue;
+            if (str_starts_with($l, '+')) $additions++;
+            elseif (str_starts_with($l, '-')) $deletions++;
+        }
+    } elseif ($isUntracked && !empty($content)) {
+        $additions = substr_count($content, "\n") + 1;
+    }
+
+    echo json_encode([
+        'status' => 'ok',
+        'path' => $relPath,
+        'name' => basename($relPath),
+        'is_untracked' => $isUntracked,
+        'diff' => $diffOut,
+        'content' => $content,
+        'additions' => $additions,
+        'deletions' => $deletions,
     ]);
     exit;
 }

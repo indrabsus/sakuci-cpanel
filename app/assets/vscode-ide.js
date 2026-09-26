@@ -21,6 +21,11 @@
     let currentMode = window.innerWidth <= 768 && !project.initialPath ? 'explorer' : 'editor';
     const expandedFolders = new Set(['', 'app', 'routes', 'public', 'resources']);
 
+    // Status Auto-save (Disimpan di localStorage, default: ON)
+    let autoSaveEnabled = localStorage.getItem('vsc_autosave') !== 'false';
+    let autoSaveTimer = null;
+    let currentDiffPath = null;
+
     // Elemen DOM
     const elWorkspace = document.getElementById('vsc-workspace');
     const elSidebar = document.getElementById('vsc-sidebar');
@@ -34,6 +39,15 @@
     const elStatusLang = document.getElementById('vsc-status-lang');
     const elStatusSave = document.getElementById('vsc-status-save');
     const elStatusBranch = document.getElementById('vsc-status-branch');
+
+    // Elemen Auto-save
+    const elBtnTopAutosave = document.getElementById('vsc-btn-top-autosave');
+    const elTopAutosaveText = document.getElementById('vsc-top-autosave-text');
+    const elTopAutosaveIcon = document.getElementById('vsc-top-autosave-icon');
+    const elBtnSubbarAutosave = document.getElementById('vsc-autosave-toggle-btn');
+    const elSubbarAutosaveText = document.getElementById('vsc-subbar-autosave-text');
+    const elSubbarAutosaveIcon = document.getElementById('vsc-subbar-autosave-icon');
+    const elStatusAutosave = document.getElementById('vsc-status-autosave');
 
     // Tab switcher buttons
     const elBtnTabExplorer = document.getElementById('tab-btn-explorer');
@@ -49,6 +63,64 @@
     const elCommitList = document.getElementById('vsc-commit-list');
     const elGitBranchName = document.getElementById('vsc-git-branch-name');
     const elGitStatusSummary = document.getElementById('vsc-git-status-summary');
+    const elScBadgeCount = document.getElementById('vsc-sc-badge-count');
+    const elScQuickMsg = document.getElementById('vsc-sc-quick-msg');
+    const elScQuickBtn = document.getElementById('vsc-sc-quick-btn');
+
+    // ---------------- Helper Auto-save UI & Controller ---------------- //
+    function updateAutoSaveUI() {
+        if (elBtnTopAutosave) {
+            elBtnTopAutosave.classList.toggle('active', autoSaveEnabled);
+            elBtnTopAutosave.classList.toggle('inactive', !autoSaveEnabled);
+        }
+        if (elTopAutosaveIcon) {
+            elTopAutosaveIcon.textContent = autoSaveEnabled ? '⚡' : '⏸️';
+        }
+        if (elTopAutosaveText) {
+            elTopAutosaveText.textContent = autoSaveEnabled ? 'Auto-save: ON' : 'Auto-save: OFF';
+        }
+
+        if (elBtnSubbarAutosave) {
+            elBtnSubbarAutosave.classList.toggle('active', autoSaveEnabled);
+            elBtnSubbarAutosave.classList.toggle('inactive', !autoSaveEnabled);
+        }
+        if (elSubbarAutosaveIcon) {
+            elSubbarAutosaveIcon.textContent = autoSaveEnabled ? '⚡' : '⏸️';
+        }
+        if (elSubbarAutosaveText) {
+            elSubbarAutosaveText.textContent = autoSaveEnabled ? 'Auto-save: ON' : 'Auto-save: OFF';
+        }
+
+        if (elStatusAutosave) {
+            elStatusAutosave.classList.toggle('active', autoSaveEnabled);
+            elStatusAutosave.innerHTML = autoSaveEnabled ? '⚡ Auto-save: ON' : '⏸️ Auto-save: OFF';
+        }
+    }
+
+    function toggleAutoSave() {
+        autoSaveEnabled = !autoSaveEnabled;
+        localStorage.setItem('vsc_autosave', autoSaveEnabled ? 'true' : 'false');
+        updateAutoSaveUI();
+
+        if (!autoSaveEnabled && autoSaveTimer) {
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = null;
+        }
+
+        setStatusSave(
+            autoSaveEnabled ? '⚡ Auto-save aktif' : '⏸️ Auto-save dinonaktifkan (Manual simpan)',
+            autoSaveEnabled ? '#86efac' : '#fde047'
+        );
+
+        if (autoSaveEnabled && activeTabPath) {
+            const activeTab = tabs.find(t => t.path === activeTabPath);
+            if (activeTab && activeTab.isDirty && activeTab.canEdit) {
+                autoSaveTimer = setTimeout(() => {
+                    saveActiveFile(true);
+                }, 800);
+            }
+        }
+    }
 
     // ---------------- 1. Otomatisasi HTML / PHP Snippets & Emmet ---------------- //
     function registerSnippetsAndEmmet() {
@@ -349,6 +421,20 @@
                         updateSaveButtonsState('dirty');
                     }
                 }
+
+                if (autoSaveEnabled && newTab.canEdit) {
+                    if (autoSaveTimer) {
+                        clearTimeout(autoSaveTimer);
+                    }
+                    if (activeTabPath === newTab.path) {
+                        setStatusSave('✍️ Mengetik…', '#93c5fd');
+                    }
+                    autoSaveTimer = setTimeout(() => {
+                        if (activeTabPath === newTab.path && newTab.isDirty) {
+                            saveActiveFile(true);
+                        }
+                    }, 1200);
+                }
             });
 
             tabs.push(newTab);
@@ -363,6 +449,15 @@
     }
 
     function activateTab(path) {
+        if (autoSaveTimer && activeTabPath && activeTabPath !== path) {
+            const prevTab = tabs.find(t => t.path === activeTabPath);
+            if (prevTab && prevTab.isDirty && prevTab.canEdit) {
+                clearTimeout(autoSaveTimer);
+                autoSaveTimer = null;
+                saveActiveFile(true);
+            }
+        }
+
         const tab = tabs.find(t => t.path === path);
         if (!tab) return;
 
@@ -416,6 +511,11 @@
 
     function closeTab(path, e) {
         if (e) e.stopPropagation();
+
+        if (autoSaveTimer && activeTabPath === path) {
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = null;
+        }
 
         const index = tabs.findIndex(t => t.path === path);
         if (index === -1) return;
@@ -633,12 +733,20 @@
         }
     }
 
-    async function saveActiveFile() {
+    async function saveActiveFile(isAutoSave = false) {
+        if (autoSaveTimer) {
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = null;
+        }
+
         if (!activeTabPath) return;
         const tab = tabs.find(t => t.path === activeTabPath);
         if (!tab || !tab.canEdit) return;
 
-        setStatusSave('<span class="vsc-spin"></span> Menyimpan…', '#ffffff');
+        setStatusSave(
+            isAutoSave ? '<span class="vsc-spin"></span> Auto-saving…' : '<span class="vsc-spin"></span> Menyimpan…',
+            isAutoSave ? '#93c5fd' : '#ffffff'
+        );
         updateSaveButtonsState('saving');
 
         const content = tab.model.getValue();
@@ -660,18 +768,26 @@
             if (data.status === 'ok') {
                 tab.isDirty = false;
                 renderTabs();
-                setStatusSave('✓ Tersimpan pada ' + new Date().toLocaleTimeString(), '#9ae6b4');
+                const timeStr = new Date().toLocaleTimeString();
+                setStatusSave(
+                    isAutoSave ? '⚡ Auto-saved ' + timeStr : '✓ Tersimpan ' + timeStr,
+                    '#9ae6b4'
+                );
                 updateSaveButtonsState('saved');
                 // Perbarui status Git setelah menyimpan berkas
                 fetchGitStatus();
             } else {
-                alert('Gagal menyimpan: ' + (data.error || 'Terjadi kesalahan'));
-                setStatusSave('Gagal menyimpan', '#feb2b2');
+                if (!isAutoSave) {
+                    alert('Gagal menyimpan: ' + (data.error || 'Terjadi kesalahan'));
+                }
+                setStatusSave('Gagal menyimpan: ' + (data.error || 'Error'), '#feb2b2');
                 updateSaveButtonsState('dirty');
             }
         } catch (err) {
-            alert('Kesalahan jaringan: ' + err.message);
-            setStatusSave('Gagal menyimpan', '#feb2b2');
+            if (!isAutoSave) {
+                alert('Kesalahan jaringan: ' + err.message);
+            }
+            setStatusSave('Gagal menyimpan: ' + err.message, '#feb2b2');
             updateSaveButtonsState('dirty');
         }
     }
@@ -1091,7 +1207,10 @@
                 if (elGitStatusSummary) {
                     elGitStatusSummary.textContent = data.total_changes > 0
                         ? `${data.total_changes} berkas berubah`
-                        : 'Bersih (Tidak ada perubahan)';
+                        : '0 berkas berubah (Repositori Bersih)';
+                }
+                if (elScBadgeCount) {
+                    elScBadgeCount.textContent = data.total_changes || 0;
                 }
 
                 renderTree();
@@ -1109,33 +1228,86 @@
 
         const files = gitStatusData.files || [];
         if (files.length === 0) {
-            elGitFileList.innerHTML = '<div style="color:var(--vsc-text-dim); font-size:12.5px; font-style:italic; padding:8px 0">Tidak ada perubahan lokal. Semua berkas tersinkronisasi.</div>';
+            elGitFileList.innerHTML = `
+                <div class="vsc-sc-clean-state">
+                    <span style="font-size:22px">🌿</span>
+                    <div style="font-weight:600; color:var(--vsc-text-bright); font-size:13px">Repositori Bersih</div>
+                    <div style="font-size:11.5px; color:var(--vsc-text-dim)">Tidak ada perubahan kode yang belum di-commit.</div>
+                </div>
+            `;
             return;
         }
 
         files.forEach(f => {
             const row = document.createElement('div');
-            row.className = 'vsc-git-file-row';
+            row.className = 'vsc-sc-file-item';
+
+            const typeUpper = (f.type || 'M').toUpperCase();
+            let typeTitle = 'Perubahan';
+            let badgeClass = 'm';
+            if (typeUpper === 'M') { typeTitle = 'Modified (Diubah)'; badgeClass = 'm'; }
+            else if (typeUpper === 'U' || typeUpper === '??') { typeTitle = 'Untracked (Berkas Baru)'; badgeClass = 'u'; }
+            else if (typeUpper === 'D') { typeTitle = 'Deleted (Dihapus)'; badgeClass = 'd'; }
+            else if (typeUpper === 'A') { typeTitle = 'Added (Ditambahkan)'; badgeClass = 'a'; }
+            else if (typeUpper === 'R') { typeTitle = 'Renamed (Nama Berubah)'; badgeClass = 'r'; }
+
+            const fileName = f.name || f.path.split('/').pop();
+            const fileDir = f.dir || (f.path.includes('/') ? f.path.substring(0, f.path.lastIndexOf('/')) : '');
 
             row.innerHTML = `
-                <div class="vsc-git-file-left" title="Klik untuk membuka di editor">
-                    <span class="git-badge git-badge-${f.type.toLowerCase()}">${f.type}</span>
-                    <span style="font-family:var(--vsc-font-mono); font-size:12px">${escapeHtml(f.path)}</span>
+                <div class="vsc-sc-file-main" title="${escapeHtml(f.path)}">
+                    <span class="vsc-sc-badge vsc-sc-badge-${badgeClass}" title="${typeTitle}">${escapeHtml(typeUpper === '??' ? 'U' : typeUpper)}</span>
+                    <div class="vsc-sc-file-names">
+                        <span class="vsc-sc-filename">${escapeHtml(fileName)}</span>
+                        ${fileDir ? `<span class="vsc-sc-filedir">${escapeHtml(fileDir)}</span>` : ''}
+                    </div>
                 </div>
-                <div class="vsc-git-file-actions">
-                    <button type="button" class="vsc-btn btn-sm" style="padding:2px 8px; font-size:11px" onclick="window.VSC_IDE.discardFile('${escapeHtml(f.path)}')">
-                        ↩️ Batalkan
+                <div class="vsc-sc-file-actions">
+                    <button type="button" class="vsc-sc-action-btn vsc-sc-btn-diff" title="Buka Diff (Perbandingan Baris Sebelum & Sesudah)">
+                        🔍 Diff
+                    </button>
+                    ${typeUpper !== 'D' ? `
+                    <button type="button" class="vsc-sc-action-btn vsc-sc-btn-open" title="Buka di Editor">
+                        📄 Buka
+                    </button>
+                    ` : ''}
+                    <button type="button" class="vsc-sc-action-btn vsc-sc-action-discard" title="Batalkan perubahan berkas ini (Discard)">
+                        ↩️
                     </button>
                 </div>
             `;
 
-            row.querySelector('.vsc-git-file-left').addEventListener('click', () => {
-                if (f.type !== 'D') {
+            row.querySelector('.vsc-sc-file-main').addEventListener('click', () => {
+                if (typeUpper !== 'D') {
                     openFile(f.path);
                 } else {
-                    alert('Berkas ini telah dihapus.');
+                    showFileDiff(f.path);
                 }
             });
+
+            const diffBtn = row.querySelector('.vsc-sc-btn-diff');
+            if (diffBtn) {
+                diffBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showFileDiff(f.path);
+                });
+            }
+
+            const openBtn = row.querySelector('.vsc-sc-btn-open');
+            if (openBtn) {
+                openBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openFile(f.path);
+                });
+            }
+
+            const discardBtn = row.querySelector('.vsc-sc-action-discard');
+            if (discardBtn) {
+                discardBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    discardFile(f.path);
+                });
+            }
 
             elGitFileList.appendChild(row);
         });
@@ -1197,6 +1369,189 @@
 
             elCommitList.appendChild(row);
         });
+    }
+
+    // ---------------- 9b. Diff Viewer & Quick Commit ---------------- //
+    async function showFileDiff(path) {
+        currentDiffPath = path;
+        const modal = document.getElementById('diff-modal');
+        const filenameEl = document.getElementById('diff-modal-filename');
+        const statsEl = document.getElementById('diff-modal-stats');
+        const contentEl = document.getElementById('diff-viewer-content');
+
+        if (filenameEl) filenameEl.textContent = path;
+        if (statsEl) statsEl.innerHTML = '';
+        if (contentEl) {
+            contentEl.innerHTML = '<div style="padding:28px 16px; text-align:center; color:var(--vsc-text-dim)"><span class="vsc-spin"></span> Memuat perbedaan baris (diff)…</div>';
+        }
+        if (modal) modal.style.display = 'flex';
+
+        try {
+            const res = await fetch(`api/git-ops.php?action=diff&project_id=${projectId}&path=${encodeURIComponent(path)}`, {
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+
+            if (data.status === 'ok') {
+                if (statsEl) {
+                    const adds = data.additions || 0;
+                    const dels = data.deletions || 0;
+                    statsEl.innerHTML = `
+                        <span class="vsc-diff-stat-add">+${adds}</span>
+                        <span class="vsc-diff-stat-del">-${dels}</span>
+                    `;
+                }
+
+                if (contentEl) {
+                    renderDiffContent(contentEl, data.diff || '', data.is_untracked, data.untracked_content);
+                }
+            } else {
+                if (contentEl) {
+                    contentEl.innerHTML = `<div style="padding:24px; color:#ef4444; font-size:13px">Gagal memuat diff: ${escapeHtml(data.error || 'Terjadi kesalahan')}</div>`;
+                }
+            }
+        } catch (err) {
+            if (contentEl) {
+                contentEl.innerHTML = `<div style="padding:24px; color:#ef4444; font-size:13px">Kesalahan jaringan: ${escapeHtml(err.message)}</div>`;
+            }
+        }
+    }
+
+    function renderDiffContent(container, diffText, isUntracked, untrackedContent) {
+        container.innerHTML = '';
+        const linesWrap = document.createElement('div');
+        linesWrap.className = 'vsc-diff-lines-wrap';
+
+        if (isUntracked) {
+            const banner = document.createElement('div');
+            banner.className = 'vsc-diff-untracked-banner';
+            banner.innerHTML = '<span>ℹ️ Berkas Baru (Untracked). Seluruh isi baris di bawah ini adalah penambahan baru:</span>';
+            linesWrap.appendChild(banner);
+
+            const lines = (untrackedContent || '').split('\n');
+            lines.forEach((lineText, idx) => {
+                const row = document.createElement('div');
+                row.className = 'vsc-diff-line diff-line-add';
+                row.innerHTML = `
+                    <span class="diff-line-num"> </span>
+                    <span class="diff-line-num">${idx + 1}</span>
+                    <span class="diff-line-sign">+</span>
+                    <span class="diff-line-text">${escapeHtml(lineText || ' ')}</span>
+                `;
+                linesWrap.appendChild(row);
+            });
+            container.appendChild(linesWrap);
+            return;
+        }
+
+        if (!diffText || !diffText.trim()) {
+            linesWrap.innerHTML = '<div style="padding:28px 16px; text-align:center; color:var(--vsc-text-dim)">Tidak ada perbedaan isi yang terdeteksi antara salinan lokal dan commit terakhir.</div>';
+            container.appendChild(linesWrap);
+            return;
+        }
+
+        const lines = diffText.split('\n');
+        let oldLine = 0;
+        let newLine = 0;
+
+        lines.forEach(line => {
+            const row = document.createElement('div');
+            row.className = 'vsc-diff-line';
+
+            if (line.startsWith('@@')) {
+                const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+                if (match) {
+                    oldLine = parseInt(match[1], 10) - 1;
+                    newLine = parseInt(match[2], 10) - 1;
+                }
+                row.classList.add('diff-line-hunk');
+                row.innerHTML = `
+                    <span class="diff-line-num">...</span>
+                    <span class="diff-line-num">...</span>
+                    <span class="diff-line-sign"> </span>
+                    <span class="diff-line-text">${escapeHtml(line)}</span>
+                `;
+            } else if (line.startsWith('--- ') || line.startsWith('+++ ') || line.startsWith('diff --git') || line.startsWith('index ')) {
+                row.classList.add('diff-line-meta');
+                row.innerHTML = `
+                    <span class="diff-line-num"> </span>
+                    <span class="diff-line-num"> </span>
+                    <span class="diff-line-sign"> </span>
+                    <span class="diff-line-text">${escapeHtml(line)}</span>
+                `;
+            } else if (line.startsWith('+')) {
+                newLine++;
+                row.classList.add('diff-line-add');
+                row.innerHTML = `
+                    <span class="diff-line-num"> </span>
+                    <span class="diff-line-num">${newLine}</span>
+                    <span class="diff-line-sign">+</span>
+                    <span class="diff-line-text">${escapeHtml(line.slice(1) || ' ')}</span>
+                `;
+            } else if (line.startsWith('-')) {
+                oldLine++;
+                row.classList.add('diff-line-del');
+                row.innerHTML = `
+                    <span class="diff-line-num">${oldLine}</span>
+                    <span class="diff-line-num"> </span>
+                    <span class="diff-line-sign">-</span>
+                    <span class="diff-line-text">${escapeHtml(line.slice(1) || ' ')}</span>
+                `;
+            } else {
+                oldLine++;
+                newLine++;
+                row.classList.add('diff-line-ctx');
+                const cleanText = line.startsWith(' ') ? line.slice(1) : line;
+                row.innerHTML = `
+                    <span class="diff-line-num">${oldLine}</span>
+                    <span class="diff-line-num">${newLine}</span>
+                    <span class="diff-line-sign"> </span>
+                    <span class="diff-line-text">${escapeHtml(cleanText || ' ')}</span>
+                `;
+            }
+            linesWrap.appendChild(row);
+        });
+
+        container.appendChild(linesWrap);
+    }
+
+    function openDiffFileInEditor() {
+        if (!currentDiffPath) return;
+        const p = currentDiffPath;
+        const modal = document.getElementById('diff-modal');
+        if (modal) modal.style.display = 'none';
+        openFile(p);
+    }
+
+    async function discardDiffFile() {
+        if (!currentDiffPath) return;
+        const p = currentDiffPath;
+        const modal = document.getElementById('diff-modal');
+        if (modal) modal.style.display = 'none';
+        await discardFile(p);
+    }
+
+    function quickCommitAndPush() {
+        const input = document.getElementById('vsc-sc-quick-msg');
+        const msg = input ? input.value.trim() : '';
+        if (!msg) {
+            alert('Silakan masukkan pesan commit terlebih dahulu.');
+            if (input) input.focus();
+            return;
+        }
+
+        const pushMsgInput = document.getElementById('push-commit-msg');
+        if (pushMsgInput) {
+            pushMsgInput.value = msg;
+        }
+
+        if (typeof openPushModal === 'function') {
+            openPushModal();
+        }
+        const formPush = document.getElementById('form-push');
+        if (formPush) {
+            formPush.dispatchEvent(new Event('submit', { cancelable: true }));
+        }
     }
 
     // ---------------- 10. Batalkan Perubahan (Discard) & Rollback ---------------- //
@@ -1347,6 +1702,11 @@ Tetap kembali ke Dashboard?`;
         confirmBackToDashboard,
         openFile,
         saveActiveFile,
+        toggleAutoSave,
+        showFileDiff,
+        openDiffFileInEditor,
+        discardDiffFile,
+        quickCommitAndPush,
         undo,
         redo,
         scrollToBottom,
@@ -1377,6 +1737,7 @@ Tetap kembali ke Dashboard?`;
 
     // Auto-start saat DOM siap
     document.addEventListener('DOMContentLoaded', () => {
+        updateAutoSaveUI();
         switchView(currentMode);
         initMonaco();
         loadTree();
