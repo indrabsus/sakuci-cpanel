@@ -96,8 +96,8 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
             <button type="button" class="vsc-btn vsc-btn-cli" id="vsc-btn-cli" onclick="openCliModal()" title="Sakuci CLI Helper (Controller, Model, Migrate)">
                 ⚡ <span class="hide-mobile">CLI</span>
             </button>
-            <button type="button" class="vsc-btn vsc-btn-autosave active" id="vsc-btn-top-autosave" onclick="window.VSC_IDE && window.VSC_IDE.toggleAutoSave()" title="Klik untuk mengaktifkan / menonaktifkan Simpan Otomatis (Auto-save)">
-                <span id="vsc-top-autosave-icon">⚡</span> <span class="hide-mobile" id="vsc-top-autosave-text">Auto-save: ON</span>
+            <button type="button" class="vsc-btn vsc-btn-autosave inactive" id="vsc-btn-top-autosave" onclick="window.VSC_IDE && window.VSC_IDE.toggleAutoSave()" title="Klik untuk mengaktifkan / menonaktifkan Simpan Otomatis (Auto-save)">
+                <span id="vsc-top-autosave-icon">⏸️</span> <span class="hide-mobile" id="vsc-top-autosave-text">Auto-save: OFF</span>
             </button>
             <button type="button" class="vsc-btn vsc-btn-save" id="vsc-btn-top-save" onclick="window.VSC_IDE.saveActiveFile()" title="Simpan berkas aktif (Ctrl+S)">
                 💾 <span class="vsc-save-label">Simpan</span>
@@ -184,8 +184,8 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
                     <button type="button" class="vsc-subbar-tool-btn" id="vsc-subbar-bottom-btn" onclick="window.VSC_IDE && window.VSC_IDE.scrollToBottom()" title="Gulir ke Baris Paling Bawah">
                         ⬇️ <span class="vsc-subbar-btn-text">Bawah</span>
                     </button>
-                    <button type="button" class="vsc-subbar-tool-btn vsc-autosave-toggle-btn active" id="vsc-autosave-toggle-btn" onclick="window.VSC_IDE && window.VSC_IDE.toggleAutoSave()" title="Klik untuk mengaktifkan / menonaktifkan Simpan Otomatis (Auto-save)">
-                        <span id="vsc-subbar-autosave-icon">⚡</span> <span class="vsc-subbar-btn-text" id="vsc-subbar-autosave-text">Auto-save: ON</span>
+                    <button type="button" class="vsc-subbar-tool-btn vsc-autosave-toggle-btn inactive" id="vsc-autosave-toggle-btn" onclick="window.VSC_IDE && window.VSC_IDE.toggleAutoSave()" title="Klik untuk mengaktifkan / menonaktifkan Simpan Otomatis (Auto-save)">
+                        <span id="vsc-subbar-autosave-icon">⏸️</span> <span class="vsc-subbar-btn-text" id="vsc-subbar-autosave-text">Auto-save: OFF</span>
                     </button>
                     <button type="button" class="vsc-subbar-save-btn" id="vsc-subbar-save-btn" onclick="window.VSC_IDE.saveActiveFile()" title="Simpan berkas (Ctrl+S)">
                         💾 <span class="vsc-subbar-save-text">Simpan</span>
@@ -327,7 +327,7 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
                 ⎇ <span id="vsc-status-branch"><?php echo htmlspecialchars($project['git_branch'] ?: 'main'); ?></span>
             </span>
             <span class="vsc-status-item vsc-status-autosave-item" id="vsc-status-autosave" style="cursor:pointer" onclick="window.VSC_IDE && window.VSC_IDE.toggleAutoSave()" title="Klik untuk mengubah pengaturan Auto-save">
-                ⚡ Auto-save: ON
+                ⏸️ Auto-save: OFF
             </span>
             <?php if ($hasToken && !$isLocal): ?>
                 <button type="button" class="vsc-status-btn" onclick="openPushModal()" title="Kirim perubahan lokal ke GitHub">

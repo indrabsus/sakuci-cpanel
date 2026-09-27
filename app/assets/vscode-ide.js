@@ -21,9 +21,10 @@
     let currentMode = window.innerWidth <= 768 && !project.initialPath ? 'explorer' : 'editor';
     const expandedFolders = new Set(['', 'app', 'routes', 'public', 'resources']);
 
-    // Status Auto-save (Disimpan di localStorage, default: ON)
-    let autoSaveEnabled = localStorage.getItem('vsc_autosave') !== 'false';
+    // Status Auto-save (Disimpan di localStorage, default: OFF untuk hemat resource)
+    let autoSaveEnabled = localStorage.getItem('vsc_autosave') === 'true';
     let autoSaveTimer = null;
+    let isSaving = false;
     let currentDiffPath = null;
 
     // Elemen DOM
@@ -108,7 +109,7 @@
         }
 
         setStatusSave(
-            autoSaveEnabled ? '⚡ Auto-save aktif' : '⏸️ Auto-save dinonaktifkan (Manual simpan)',
+            autoSaveEnabled ? '⚡ Auto-save aktif (Tersimpan otomatis saat jeda ngetik)' : '⏸️ Auto-save dinonaktifkan (Simpan manual via Ctrl+S)',
             autoSaveEnabled ? '#86efac' : '#fde047'
         );
 
@@ -117,7 +118,7 @@
             if (activeTab && activeTab.isDirty && activeTab.canEdit) {
                 autoSaveTimer = setTimeout(() => {
                     saveActiveFile(true);
-                }, 800);
+                }, 2500);
             }
         }
     }
@@ -426,14 +427,11 @@
                     if (autoSaveTimer) {
                         clearTimeout(autoSaveTimer);
                     }
-                    if (activeTabPath === newTab.path) {
-                        setStatusSave('✍️ Mengetik…', '#93c5fd');
-                    }
                     autoSaveTimer = setTimeout(() => {
                         if (activeTabPath === newTab.path && newTab.isDirty) {
                             saveActiveFile(true);
                         }
-                    }, 1200);
+                    }, 2500);
                 }
             });
 
@@ -739,15 +737,17 @@
             autoSaveTimer = null;
         }
 
+        if (isSaving) return;
         if (!activeTabPath) return;
         const tab = tabs.find(t => t.path === activeTabPath);
         if (!tab || !tab.canEdit) return;
 
-        setStatusSave(
-            isAutoSave ? '<span class="vsc-spin"></span> Auto-saving…' : '<span class="vsc-spin"></span> Menyimpan…',
-            isAutoSave ? '#93c5fd' : '#ffffff'
-        );
-        updateSaveButtonsState('saving');
+        isSaving = true;
+
+        if (!isAutoSave) {
+            setStatusSave('<span class="vsc-spin"></span> Menyimpan…', '#ffffff');
+            updateSaveButtonsState('saving');
+        }
 
         const content = tab.model.getValue();
         const formData = new URLSearchParams();
@@ -769,13 +769,16 @@
                 tab.isDirty = false;
                 renderTabs();
                 const timeStr = new Date().toLocaleTimeString();
-                setStatusSave(
-                    isAutoSave ? '⚡ Auto-saved ' + timeStr : '✓ Tersimpan ' + timeStr,
-                    '#9ae6b4'
-                );
-                updateSaveButtonsState('saved');
-                // Perbarui status Git setelah menyimpan berkas
-                fetchGitStatus();
+                if (isAutoSave) {
+                    setStatusSave('⚡ Auto-saved ' + timeStr, '#9ae6b4');
+                    updateSaveButtonsState('idle');
+                    // PENTING: Jangan panggil fetchGitStatus() saat autosave
+                    // agar tidak menjalankan shell git di server dan tidak merusak performa pengetikan.
+                } else {
+                    setStatusSave('✓ Tersimpan pada ' + timeStr, '#9ae6b4');
+                    updateSaveButtonsState('saved');
+                    fetchGitStatus();
+                }
             } else {
                 if (!isAutoSave) {
                     alert('Gagal menyimpan: ' + (data.error || 'Terjadi kesalahan'));
@@ -789,6 +792,8 @@
             }
             setStatusSave('Gagal menyimpan: ' + err.message, '#feb2b2');
             updateSaveButtonsState('dirty');
+        } finally {
+            isSaving = false;
         }
     }
 
@@ -1213,7 +1218,9 @@
                     elScBadgeCount.textContent = data.total_changes || 0;
                 }
 
-                renderTree();
+                if (currentMode === 'explorer') {
+                    renderTree();
+                }
                 renderTabs();
                 renderGitFileList();
             }
