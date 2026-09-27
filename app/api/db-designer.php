@@ -54,8 +54,12 @@ $dbConn->set_charset('utf8mb4');
 // Fungsi pembantu validasi nama identifier SQL
 
 // Format tipe kolom dan panjang/nilai SQL (termasuk ENUM)
-function format_sql_column_type(mysqli $dbConn, string $cType, string $cLength): string {
+function format_sql_column_type(mysqli $dbConn, string $cType, string $cLength, bool $isUnsigned = false): string {
     $cType = strtoupper(trim($cType));
+    if (stripos($cType, 'UNSIGNED') !== false) {
+        $isUnsigned = true;
+        $cType = trim(str_ireplace('UNSIGNED', '', $cType));
+    }
     if ($cType === 'ENUM') {
         $raw = trim($cLength);
         if (str_starts_with($raw, '(') && str_ends_with($raw, ')')) {
@@ -92,6 +96,11 @@ function format_sql_column_type(mysqli $dbConn, string $cType, string $cLength):
     } elseif ($cType === 'VARCHAR' && $cLength === '') {
         $typeWithLen .= "(255)";
     }
+
+    if ($isUnsigned && in_array($cType, ['INT', 'BIGINT', 'TINYINT', 'SMALLINT', 'DECIMAL', 'FLOAT', 'DOUBLE'], true)) {
+        $typeWithLen .= " UNSIGNED";
+    }
+
     return $typeWithLen;
 }
 
@@ -327,7 +336,8 @@ try {
             }
 
             $cLength = trim((string) ($col['length'] ?? ''));
-            $typeWithLen = format_sql_column_type($dbConn, $cType, $cLength);
+            $isUnsigned = !empty($col['is_unsigned']);
+            $typeWithLen = format_sql_column_type($dbConn, $cType, $cLength, $isUnsigned);
 
             $nullSql = (!empty($col['is_null']) || (isset($col['null']) && $col['null'] === true)) ? "NULL" : "NOT NULL";
             $extraSql = "";
@@ -430,7 +440,8 @@ try {
         }
 
         $cLength = trim((string) ($_POST['length'] ?? ''));
-        $typeWithLen = format_sql_column_type($dbConn, $cType, $cLength);
+        $isUnsigned = !empty($_POST['is_unsigned']);
+        $typeWithLen = format_sql_column_type($dbConn, $cType, $cLength, $isUnsigned);
 
         $nullSql = !empty($_POST['is_null']) ? "NULL" : "NOT NULL";
         $defaultSql = "";
@@ -505,7 +516,8 @@ try {
         }
 
         $cLength = trim((string) ($_POST['length'] ?? ''));
-        $typeWithLen = format_sql_column_type($dbConn, $cType, $cLength);
+        $isUnsigned = !empty($_POST['is_unsigned']);
+        $typeWithLen = format_sql_column_type($dbConn, $cType, $cLength, $isUnsigned);
 
         $nullSql = !empty($_POST['is_null']) ? "NULL" : "NOT NULL";
         $defaultSql = "";
@@ -1332,6 +1344,7 @@ try {
                 $isUnique = (strpos($c['Key'] ?? '', 'UNI') !== false);
                 $isIndexed = ($c['Key'] ?? '') !== '';
                 $isAi = (strpos($c['Extra'] ?? '', 'auto_increment') !== false);
+                $isUnsigned = (stripos($c['Type'] ?? '', 'unsigned') !== false);
 
                 $cols[] = [
                     'name' => $c['Field'],
@@ -1342,6 +1355,7 @@ try {
                     'is_unique' => $isUnique,
                     'is_indexed' => $isIndexed,
                     'is_ai' => $isAi,
+                    'is_unsigned' => $isUnsigned,
                     'default' => $c['Default'],
                     'extra' => $c['Extra'],
                     'comment' => $c['Comment'] ?? ''

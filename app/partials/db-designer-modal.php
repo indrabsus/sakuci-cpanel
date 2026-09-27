@@ -193,12 +193,19 @@
                             <input type="text" id="dsg-add-col-default" class="designer-input" placeholder="NULL, 0, dll">
                         </div>
                     </div>
-                    <div class="designer-form-group">
-                        <label class="designer-form-label">Posisi Kolom:</label>
-                        <select id="dsg-add-col-position" class="designer-select">
-                            <option value="AFTER_LAST">Di Akhir Tabel (Bawaan)</option>
-                            <option value="FIRST">Di Awal Tabel (Paling Pertama)</option>
-                        </select>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+                        <div class="designer-form-group">
+                            <label class="designer-form-label">Posisi Kolom:</label>
+                            <select id="dsg-add-col-position" class="designer-select">
+                                <option value="AFTER_LAST">Di Akhir Tabel (Bawaan)</option>
+                                <option value="FIRST">Di Awal Tabel (Paling Pertama)</option>
+                            </select>
+                        </div>
+                        <div class="designer-form-group" style="display:flex; align-items:flex-end">
+                            <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-bottom:10px; color:#e2e8f0; cursor:pointer">
+                                <input type="checkbox" id="dsg-add-col-unsigned"> Unsigned (Angka Positif)
+                            </label>
+                        </div>
                     </div>
                 </div>
                 <div class="designer-submodal-footer">
@@ -417,10 +424,17 @@
                             <input type="text" id="dsg-edit-col-default" class="designer-input" placeholder="NULL, 0, dll">
                         </div>
                     </div>
-                    <div class="designer-form-group">
-                        <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-top:4px; color:#e2e8f0; cursor:pointer">
-                            <input type="checkbox" id="dsg-edit-col-ai"> Auto Increment (Hanya untuk Primary Key INT)
-                        </label>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+                        <div class="designer-form-group">
+                            <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-top:4px; color:#e2e8f0; cursor:pointer">
+                                <input type="checkbox" id="dsg-edit-col-ai"> Auto Increment (Primary Key)
+                            </label>
+                        </div>
+                        <div class="designer-form-group">
+                            <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-top:4px; color:#e2e8f0; cursor:pointer">
+                                <input type="checkbox" id="dsg-edit-col-unsigned"> Unsigned (Angka Positif)
+                            </label>
+                        </div>
                     </div>
                 </div>
                 <div class="designer-submodal-footer">

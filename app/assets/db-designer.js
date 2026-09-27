@@ -1244,6 +1244,40 @@
     // ------------------------------------------------------------------
     // FITUR 2C: EDIT / UBAH KOLOM (MODIFY COLUMN)
     // ------------------------------------------------------------------
+    function parseSqlColumnType(raw) {
+        const rawType = (raw || '').trim();
+        const isUnsigned = /\bunsigned\b/i.test(rawType);
+
+        // Bersihkan atribut tambahan seperti unsigned, zerofill, binary
+        const clean = rawType.replace(/\b(unsigned|zerofill|binary)\b/gi, '').trim();
+
+        // Ambil nama tipe dan nilai di dalam kurung: contoh int(11), varchar(255), enum('a','b')
+        const match = clean.match(/^([a-zA-Z]+)(?:\(([\s\S]*)\))?/);
+        let baseType = match ? match[1].toUpperCase() : 'VARCHAR';
+        let lenVal = (match && match[2] !== undefined) ? match[2].trim() : '';
+
+        // Pemetaan alias ke tipe yang didukung di designer
+        if (baseType === 'INTEGER') {
+            baseType = 'INT';
+        } else if (baseType === 'TINYINT' && lenVal === '1') {
+            baseType = 'BOOLEAN';
+            lenVal = '';
+        } else if (['TINYINT', 'SMALLINT', 'MEDIUMINT'].includes(baseType)) {
+            baseType = 'INT';
+        } else if (['MEDIUMTEXT', 'LONGTEXT', 'TINYTEXT'].includes(baseType)) {
+            baseType = 'TEXT';
+        } else if (baseType === 'CHAR') {
+            baseType = 'VARCHAR';
+        } else if (['FLOAT', 'DOUBLE'].includes(baseType)) {
+            baseType = 'DECIMAL';
+        } else if (baseType === 'BOOL') {
+            baseType = 'BOOLEAN';
+            lenVal = '';
+        }
+
+        return { baseType, lenVal, isUnsigned };
+    }
+
     function openEditColumnModal(tableName, colName) {
         const tableObj = (schemaData.tables || []).find(t => t.name === tableName);
         if (!tableObj) return;
@@ -1260,21 +1294,16 @@
         const nullCheck = document.getElementById('dsg-edit-col-null');
         const defInput = document.getElementById('dsg-edit-col-default');
         const aiCheck = document.getElementById('dsg-edit-col-ai');
+        const unsignedCheck = document.getElementById('dsg-edit-col-unsigned');
 
         if (titleEl) titleEl.textContent = `Ubah Kolom: ${tableName}.${colName}`;
         if (targetTable) targetTable.value = tableName;
         if (oldName) oldName.value = colName;
         if (nameInput) nameInput.value = colName;
 
-        let baseType = 'VARCHAR';
-        let lenVal = '';
-        const rawType = (colObj.type || '').trim();
-
-        const match = rawType.match(/^([A-Za-z]+)(?:\((.*)\))?$/);
-        if (match) {
-            baseType = match[1].toUpperCase();
-            lenVal = match[2] || '';
-        }
+        const parsed = parseSqlColumnType(colObj.type);
+        let baseType = parsed.baseType;
+        let lenVal = parsed.lenVal;
 
         if (typeSelect) {
             const exists = Array.from(typeSelect.options).some(o => o.value === baseType);
@@ -1284,10 +1313,11 @@
                 typeSelect.value = 'VARCHAR';
             }
         }
-        if (lengthInput) lengthInput.value = lenVal || (baseType === 'VARCHAR' ? '255' : (baseType === 'INT' ? '11' : ''));
+        if (lengthInput) lengthInput.value = lenVal || (baseType === 'VARCHAR' ? '255' : (baseType === 'INT' ? '11' : (baseType === 'BIGINT' ? '20' : '')));
         if (nullCheck) nullCheck.checked = !!colObj.null;
         if (defInput) defInput.value = colObj.default !== null ? colObj.default : '';
         if (aiCheck) aiCheck.checked = !!colObj.is_ai;
+        if (unsignedCheck) unsignedCheck.checked = (colObj.is_unsigned !== undefined) ? !!colObj.is_unsigned : parsed.isUnsigned;
 
         openSubmodal('edit-column');
         if (nameInput) setTimeout(() => nameInput.focus(), 150);
@@ -1304,6 +1334,7 @@
         const isNull = document.getElementById('dsg-edit-col-null')?.checked ? '1' : '';
         const defVal = (document.getElementById('dsg-edit-col-default')?.value || '').trim();
         const isAi = document.getElementById('dsg-edit-col-ai')?.checked ? '1' : '';
+        const isUnsigned = document.getElementById('dsg-edit-col-unsigned')?.checked ? '1' : '';
 
         if (!tableName || !oldCol || !newCol) {
             alert('Nama kolom wajib diisi.');
@@ -1321,6 +1352,7 @@
         fd.append('is_null', isNull);
         fd.append('default', defVal);
         fd.append('is_ai', isAi);
+        fd.append('is_unsigned', isUnsigned);
 
         try {
             const res = await fetch('api/db-designer.php', {
@@ -1375,6 +1407,8 @@
         if (lengthInput) lengthInput.value = '255';
         if (nullCheck) nullCheck.checked = true;
         if (defInput) defInput.value = '';
+        const unsignedCheck = document.getElementById('dsg-add-col-unsigned');
+        if (unsignedCheck) unsignedCheck.checked = false;
 
         if (posSelect) {
             let posHtml = `
@@ -1401,6 +1435,7 @@
         const isNull = document.getElementById('dsg-add-col-null')?.checked ? '1' : '';
         const defVal = (document.getElementById('dsg-add-col-default')?.value || '').trim();
         const posVal = document.getElementById('dsg-add-col-position')?.value || 'AFTER_LAST';
+        const isUnsigned = document.getElementById('dsg-add-col-unsigned')?.checked ? '1' : '';
 
         if (!tableName || !colName) {
             alert('Nama kolom wajib diisi.');
@@ -1428,6 +1463,7 @@
         fd.append('default', defVal);
         fd.append('position', position);
         fd.append('after_column', afterCol);
+        fd.append('is_unsigned', isUnsigned);
 
         try {
             const res = await fetch('api/db-designer.php', {
