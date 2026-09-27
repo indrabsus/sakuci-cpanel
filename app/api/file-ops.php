@@ -197,6 +197,70 @@ if ($action === 'save') {
     exit;
 }
 
+// ---------------- 3b. Menyimpan Banyak Berkas Sekaligus (Save All) ---------------- //
+if ($action === 'save_batch' || $action === 'save_all') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['error' => 'Method not allowed']);
+        exit;
+    }
+
+    $rawFiles = $_POST['files'] ?? '';
+    $files = is_array($rawFiles) ? $rawFiles : json_decode($rawFiles, true);
+    if (!is_array($files) || empty($files)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Tidak ada berkas yang dikirim untuk disimpan.']);
+        exit;
+    }
+
+    $saved = [];
+    $errors = [];
+
+    foreach ($files as $item) {
+        $relPath = trim((string) ($item['path'] ?? ''));
+        $content = (string) ($item['content'] ?? '');
+        if ($relPath === '') continue;
+
+        $target = project_path($root, $relPath);
+        if (!$target || !is_file($target)) {
+            $errors[$relPath] = 'Berkas tidak ditemukan.';
+            continue;
+        }
+
+        $isEnv = is_env_file(basename($target));
+        $canEdit = $canEditProject || $isEnv;
+        if (!$canEdit) {
+            $errors[$relPath] = 'Berkas bersifat Read-Only.';
+            continue;
+        }
+
+        if (!is_writable($target)) {
+            $errors[$relPath] = 'Berkas tidak dapat ditulis di server.';
+            continue;
+        }
+
+        $content = str_replace("\r\n", "\n", $content);
+        if (file_put_contents($target, $content) === false) {
+            $errors[$relPath] = 'Gagal menulis berkas ke disk.';
+            continue;
+        }
+
+        $saved[] = [
+            'path' => $relPath,
+            'size' => filesize($target),
+            'mtime' => filemtime($target),
+        ];
+    }
+
+    echo json_encode([
+        'status' => empty($errors) ? 'ok' : (empty($saved) ? 'error' : 'partial'),
+        'saved_count' => count($saved),
+        'saved' => $saved,
+        'errors' => $errors,
+    ]);
+    exit;
+}
+
 // ---------------- 4. Membuat Berkas Baru ---------------- //
 if ($action === 'create_file') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

@@ -102,6 +102,9 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
             <button type="button" class="vsc-btn vsc-btn-save" id="vsc-btn-top-save" onclick="window.VSC_IDE.saveActiveFile()" title="Simpan berkas aktif (Ctrl+S)">
                 💾 <span class="vsc-save-label">Simpan</span>
             </button>
+            <button type="button" class="vsc-btn vsc-btn-save-all" id="vsc-btn-top-save-all" onclick="window.VSC_IDE.saveAllFiles()" title="Simpan semua berkas yang telah diubah (Ctrl+Alt+S / Ctrl+Shift+S)">
+                📚 <span class="vsc-save-all-label hide-mobile">Semua</span><span id="vsc-save-all-badge" class="vsc-save-all-badge" style="display:none">0</span>
+            </button>
             <?php if ($hasToken && !$isLocal): ?>
                 <button type="button" class="vsc-btn vsc-btn-push" onclick="openPushModal()" title="Commit &amp; Push ke GitHub">
                     🚀 <span class="hide-mobile">Push</span>
@@ -190,6 +193,9 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
                     <button type="button" class="vsc-subbar-save-btn" id="vsc-subbar-save-btn" onclick="window.VSC_IDE.saveActiveFile()" title="Simpan berkas (Ctrl+S)">
                         💾 <span class="vsc-subbar-save-text">Simpan</span>
                     </button>
+                    <button type="button" class="vsc-subbar-tool-btn vsc-subbar-save-all-btn" id="vsc-subbar-save-all-btn" onclick="window.VSC_IDE.saveAllFiles()" title="Simpan Semua Berkas (Ctrl+Alt+S)" style="display:none">
+                        📚 <span class="vsc-subbar-btn-text">Semua</span>
+                    </button>
                 </div>
             </div>
 
@@ -236,7 +242,11 @@ $dbId = $projectDb ? (int) $projectDb['id'] : 0;
                     </div>
                     <div class="vsc-shortcut-item">
                         <span class="vsc-key">Ctrl + S</span>
-                        <span>Simpan berkas seketika</span>
+                        <span>Simpan berkas aktif</span>
+                    </div>
+                    <div class="vsc-shortcut-item">
+                        <span class="vsc-key">Ctrl + Alt + S</span>
+                        <span>Simpan semua berkas sekaligus</span>
                     </div>
                     <div class="vsc-shortcut-item">
                         <span class="vsc-key">Ctrl + F</span>

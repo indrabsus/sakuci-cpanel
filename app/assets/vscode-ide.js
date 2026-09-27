@@ -286,9 +286,19 @@
                 }
             });
 
-            // Pintasan Ctrl+S / Cmd+S untuk simpan
+            // Pintasan Ctrl+S / Cmd+S untuk simpan berkas aktif
             editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function () {
                 saveActiveFile();
+            });
+
+            // Pintasan Ctrl+Alt+S / Cmd+Alt+S untuk simpan semua berkas
+            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyS, function () {
+                saveAllFiles();
+            });
+
+            // Pintasan Ctrl+Shift+S / Cmd+Shift+S untuk simpan semua berkas
+            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyS, function () {
+                saveAllFiles();
             });
 
             // Pintasan F2 untuk membuka Sakuci CLI Helper
@@ -584,6 +594,8 @@
 
             elTabsBar.appendChild(el);
         });
+
+        updateSaveAllButtons();
     }
 
     function updateBreadcrumb(path) {
@@ -794,6 +806,109 @@
             updateSaveButtonsState('dirty');
         } finally {
             isSaving = false;
+            updateSaveAllButtons();
+        }
+    }
+
+    function updateSaveAllButtons() {
+        const dirtyTabs = tabs.filter(t => t.isDirty && t.canEdit);
+        const dirtyCount = dirtyTabs.length;
+        const topSaveAllBtn = document.getElementById('vsc-btn-top-save-all');
+        const subbarSaveAllBtn = document.getElementById('vsc-subbar-save-all-btn');
+        const badge = document.getElementById('vsc-save-all-badge');
+
+        if (badge) {
+            badge.textContent = dirtyCount;
+            badge.style.display = dirtyCount > 0 ? 'inline-flex' : 'none';
+        }
+
+        if (topSaveAllBtn) {
+            topSaveAllBtn.classList.toggle('has-dirty', dirtyCount > 0);
+            topSaveAllBtn.title = dirtyCount > 0
+                ? `Simpan semua ${dirtyCount} berkas yang telah diubah (Ctrl+Alt+S / Ctrl+Shift+S)`
+                : 'Simpan semua berkas (Ctrl+Alt+S / Ctrl+Shift+S)';
+        }
+
+        if (subbarSaveAllBtn) {
+            subbarSaveAllBtn.style.display = dirtyCount > 0 ? 'inline-flex' : 'none';
+        }
+    }
+
+    async function saveAllFiles() {
+        if (autoSaveTimer) {
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = null;
+        }
+
+        const dirtyTabs = tabs.filter(t => t.isDirty && t.canEdit);
+        if (dirtyTabs.length === 0) {
+            setStatusSave('✓ Semua berkas sudah tersimpan', '#9ae6b4');
+            return;
+        }
+
+        if (isSaving) return;
+        isSaving = true;
+
+        const count = dirtyTabs.length;
+        setStatusSave(`<span class="vsc-spin"></span> Menyimpan ${count} berkas…`, '#ffffff');
+        updateSaveButtonsState('saving');
+
+        const topSaveAllBtn = document.getElementById('vsc-btn-top-save-all');
+        if (topSaveAllBtn) topSaveAllBtn.classList.add('is-saving');
+
+        const payload = dirtyTabs.map(t => ({
+            path: t.path,
+            content: t.model.getValue()
+        }));
+
+        const formData = new URLSearchParams();
+        formData.append('project_id', projectId);
+        formData.append('action', 'save_batch');
+        formData.append('files', JSON.stringify(payload));
+
+        try {
+            const res = await fetch('api/file-ops.php', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData.toString()
+            });
+            const data = await res.json();
+
+            if (data.status === 'ok' || data.saved_count > 0) {
+                const savedPaths = new Set((data.saved || []).map(s => s.path));
+                dirtyTabs.forEach(t => {
+                    if (savedPaths.has(t.path)) {
+                        t.isDirty = false;
+                    }
+                });
+
+                renderTabs();
+                updateSaveButtonsState('saved');
+
+                const timeStr = new Date().toLocaleTimeString();
+                if (data.errors && Object.keys(data.errors).length > 0) {
+                    const errCount = Object.keys(data.errors).length;
+                    alert(`Sebagian berkas berhasil disimpan (${data.saved_count} berhasil, ${errCount} gagal).`);
+                    setStatusSave(`⚠️ ${data.saved_count} berkas tersimpan, ${errCount} gagal`, '#facc15');
+                } else {
+                    setStatusSave(`✓ Semua berkas (${data.saved_count}) berhasil disimpan pada ${timeStr}`, '#9ae6b4');
+                }
+
+                fetchGitStatus();
+            } else {
+                alert('Gagal menyimpan berkas: ' + (data.error || 'Terjadi kesalahan'));
+                setStatusSave('Gagal menyimpan: ' + (data.error || 'Error'), '#feb2b2');
+                updateSaveButtonsState('dirty');
+            }
+        } catch (err) {
+            alert('Kesalahan jaringan: ' + err.message);
+            setStatusSave('Gagal menyimpan: ' + err.message, '#feb2b2');
+            updateSaveButtonsState('dirty');
+        } finally {
+            isSaving = false;
+            if (topSaveAllBtn) topSaveAllBtn.classList.remove('is-saving');
+            updateSaveAllButtons();
         }
     }
 
@@ -1729,6 +1844,8 @@ Tetap kembali ke Dashboard?`;
         rollbackToCommit,
         fetchGitStatus,
         fetchGitHistory,
+        saveAllFiles,
+        updateSaveAllButtons,
         toggleSidebar: () => {
             if (window.innerWidth <= 768) {
                 switchView(currentMode === 'explorer' ? 'editor' : 'explorer');
@@ -1751,10 +1868,14 @@ Tetap kembali ke Dashboard?`;
         fetchGitStatus();
         initResizer();
         updateSaveButtonsState('empty');
+        updateSaveAllButtons();
 
-        // Tangkap shortcut global Ctrl+S
+        // Tangkap shortcut global Ctrl+S dan Ctrl+Alt+S / Ctrl+Shift+S
         document.addEventListener('keydown', (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            if ((e.ctrlKey || e.metaKey) && (e.altKey || e.shiftKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                saveAllFiles();
+            } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
                 e.preventDefault();
                 saveActiveFile();
             }
